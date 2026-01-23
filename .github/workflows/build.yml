@@ -35,6 +35,8 @@ jobs:
         pip install pyinstaller
 
     - name: Build App
+      env:
+        MACOSX_DEPLOYMENT_TARGET: "11.0"
       run: |
         # Find where customtkinter is installed
         CTK_PATH=$(python -c "import customtkinter; import os; print(os.path.dirname(customtkinter.__file__))")
