@@ -12,11 +12,11 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-12    # Intel (x86_64) - Monterey
-            arch: x86_64
+          - os: macos-14    # Run on fast Apple Silicon runner via Rosetta
+            arch: x64       # Force Intel Python
             name: Intel
-          - os: macos-14    # Apple Silicon (M1/M2 - arm64)
-            arch: arm64
+          - os: macos-14    # Run on fast Apple Silicon runner
+            arch: arm64     # Native ARM Python
             name: AppleSilicon
 
     steps:
@@ -25,7 +25,8 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.11" # 3.11 is very stable for PyInstaller
+        python-version: "3.11"
+        architecture: ${{ matrix.arch }}
 
     - name: Install Dependencies
       run: |
