@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-13    # Intel (x86_64)
+          - os: macos-12    # Intel (x86_64) - Monterey
             arch: x86_64
             name: Intel
           - os: macos-14    # Apple Silicon (M1/M2 - arm64)
