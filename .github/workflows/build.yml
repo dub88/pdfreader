@@ -12,11 +12,11 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-14    # Run on fast Apple Silicon runner via Rosetta
-            arch: x64       # Force Intel Python
+          - os: macos-12    # Reliable native Intel runner (slower queue but correct binary)
+            arch: x86_64
             name: Intel
-          - os: macos-14    # Run on fast Apple Silicon runner
-            arch: arm64     # Native ARM Python
+          - os: macos-14    # Apple Silicon (M1/M2 - arm64)
+            arch: arm64
             name: AppleSilicon
 
     steps:
