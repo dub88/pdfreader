@@ -1,6 +1,6 @@
 customtkinter
 pymupdf
-pyobjc-framework-Cocoa
+pyobjc-framework-Cocoa==11.0
 darkdetect
 pillow
 packaging
