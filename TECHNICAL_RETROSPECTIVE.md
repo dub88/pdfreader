@@ -60,3 +60,11 @@ The application is currently stable.
 - **App Name:** Audile
 - **Build Status:** Passing (PyInstaller)
 - **Known Limitations:** Word-level karaoke highlighting is disabled to prevent crashes.
+
+### 6. Regression & Persistence of Threading Issues
+**Observations:**
+After a `git pull` introduced new features including a re-attempt at word-level callbacks using `lambda: self.after(0, ...)` to route to the main thread, the application crashed again with the same GIL error.
+**Analysis:**
+Even with `self.after`, the initial entry point into the Python environment (the delegate method itself) runs on an unmanaged thread spawned by the OS audio subsystem. The crash occurs *before* `self.after` can effectively schedule the work, or simply due to the Python interpreter being invoked without the thread state being correctly set up for PyObjC.
+**Final Action:**
+The delegate was forcibly disabled again in `tts_engine.py`. For future implementations of word-level highlighting, we must use a polling approach (checking `output_channel` or timing estimates) or a rigorous `PyObjC` specific event loop bridge (e.g. `AppHelper.runEventLoop`), which would replace the standard Tkinter `mainloop`.
