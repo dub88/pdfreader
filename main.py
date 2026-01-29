@@ -14,7 +14,7 @@ class PDFReaderApp(ctk.CTk):
         super().__init__()
 
         self.title("macOS PDF Speaker")
-        self.geometry("900x600")
+        self.geometry("950x650")
         
         # Initialize engines
         self.pdf_engine = None
@@ -57,13 +57,13 @@ class PDFReaderApp(ctk.CTk):
         self.grid_rowconfigure(0, weight=1)
 
         # Sidebar with Tabs
-        self.sidebar = ctk.CTkFrame(self, width=240, corner_radius=0)
+        self.sidebar = ctk.CTkFrame(self, width=260, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         
         self.logo_label = ctk.CTkLabel(self.sidebar, text="PDF SPEAKER", font=ctk.CTkFont(family="System", size=22, weight="bold"))
         self.logo_label.pack(padx=20, pady=(30, 10))
 
-        self.tabview = ctk.CTkTabview(self.sidebar, width=220)
+        self.tabview = ctk.CTkTabview(self.sidebar, width=240)
         self.tabview.pack(padx=10, pady=10, expand=True, fill="both")
         self.tabview.add("Library")
         self.tabview.add("Controls")
@@ -129,15 +129,15 @@ class PDFReaderApp(ctk.CTk):
         self.hide_voice_btn = ctk.CTkButton(self.voice_action_frame, text="👁 Hide", width=80, height=30, fg_color="transparent", border_width=1, command=self._hide_current_voice)
         self.hide_voice_btn.pack(side="left", padx=(2, 0), expand=True, fill="x")
         
+        self.premium_only_switch = ctk.CTkSwitch(self.ctrl_tab, text="High Quality Only", command=self._refresh_voice_list)
+        self.premium_only_switch.select()
+        self.premium_only_switch.pack(padx=10, pady=10)
+
+        self.download_help_btn = ctk.CTkButton(self.ctrl_tab, text="❓ Fix Missing Siri Voices", height=25, font=ctk.CTkFont(size=10), fg_color="transparent", command=self._show_voice_help)
+        self.download_help_btn.pack(padx=10, pady=(0, 5))
+
         self.manage_voices_btn = ctk.CTkButton(self.ctrl_tab, text="Reset Hidden Voices", height=25, font=ctk.CTkFont(size=10), fg_color="transparent", command=self._reset_hidden_voices)
         self.manage_voices_btn.pack(padx=10, pady=5)
-
-        self.download_help_btn = ctk.CTkButton(self.ctrl_tab, text="❓ Missing Siri Voice?", height=25, font=ctk.CTkFont(size=10), fg_color="transparent", command=self._show_voice_help)
-        self.download_help_btn.pack(padx=10, pady=5)
-
-        self.premium_only_switch = ctk.CTkSwitch(self.ctrl_tab, text="High Quality Only", command=self._refresh_voice_list)
-        self.premium_only_switch.select() # Default to ON
-        self.premium_only_switch.pack(padx=10, pady=10)
 
         # --- TAB: BOOKMARKS ---
         self.bmk_tab = self.tabview.tab("Bookmarks")
@@ -352,23 +352,11 @@ class PDFReaderApp(ctk.CTk):
         self._load_page_data(self.current_page_num)
         self._save_config()
 
-    def _go_to_page(self):
-        if not self.pdf_engine: return
-        try:
-            page_num = int(self.page_entry.get())
-            if 1 <= page_num <= self.pdf_engine.total_pages:
-                self._stop()
-                self._load_page_data(page_num)
-                self._save_config()
-            else: messagebox.showwarning("Invalid Page", f"Page 1-{self.pdf_engine.total_pages}")
-        except: messagebox.showwarning("Invalid Input", "Enter a page number.")
-
     def _on_speed_change(self, v):
         self.speed_label.configure(text=f"Speed: {v:.1f}x")
         self.tts_engine.set_rate(v)
 
     def _on_voice_change(self, display_name):
-        # Look up by display name
         for i, dn in enumerate(self.voice_display_names):
             if dn == display_name:
                 voice = self.voices[i]
@@ -448,8 +436,8 @@ class PDFReaderApp(ctk.CTk):
             "4. Go to 'Manage Voices...'\n"
             "5. Find 'English (United States)' and search for Siri.\n"
             "6. Click the Download icon (cloud) next to each voice.\n\n"
-            "IMPORTANT: Downloading them for 'Siri' the assistant is NOT enough. They must be downloaded here for 'Spoken Content'.\n\n"
             "Once downloaded, restart PDF Speaker!")
+        os.system("open 'x-apple.systempreferences:com.apple.preference.universalaccess?SpokenContent'")
 
     def _refresh_voice_list(self):
         raw_voices = self.tts_engine.get_voices()

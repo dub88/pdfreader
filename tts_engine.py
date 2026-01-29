@@ -32,28 +32,17 @@ class TTSEngine:
             "ralph", "trinoids", "whisper", "zarvox", "eloquence", "jester", "wobble", "superstar"
         }
         
-        # LOGGING: Detailed log to Desktop (Sorted so good stuff is at the TOP)
-        import subprocess
+        # LOGGING: Detailed log to Desktop
         log_path = os.path.expanduser("~/Desktop/pdf_speaker_voice_debug.txt")
         try:
-            # Sort voices for the log: Siri/Premium first
-            sorted_for_log = sorted(voices, key=lambda v: (
-                "siri" not in v.identifier().lower() and "ttsvoice" not in v.identifier().lower(),
-                v.quality() < 2,
-                v.name()
-            ))
-            
-            say_output = subprocess.check_output(["say", "-v", "?"], text=True)
             with open(log_path, "w") as f:
                 f.write("PDF Speaker Voice Debug Log\n")
-                f.write(f"Total Voices Detected by API: {len(voices)}\n")
+                f.write(f"Total Voices Detected: {len(voices)}\n")
                 f.write("-" * 50 + "\n")
-                f.write("TOP 30 DETECTED VOICES (PRIORITY LIST):\n")
-                for v in sorted_for_log[:30]:
-                    f.write(f"Name: {v.name()} | ID: {v.identifier()} | Lang: {v.language()} | Quality: {v.quality()}\n")
-                f.write("\n" + "-" * 50 + "\n")
-                f.write("SYSTEM 'SAY' COMMAND VOICES:\n")
-                f.write(say_output)
+                for v in voices:
+                    v_id = v.identifier().lower()
+                    is_siri_id = any(x in v_id for x in ["siri", "ttsvoice", "aaron", "nicky", "martha", "arthur", "helena"])
+                    f.write(f"Name: {v.name()} | ID: {v.identifier()} | Quality: {v.quality()} | SiriID: {is_siri_id}\n")
         except: pass
 
         for v in voices:
@@ -62,7 +51,7 @@ class TTSEngine:
             lang = v.language()
             quality_num = v.quality()
             
-            # Siri detection logic: name or ID
+            # Siri detection logic
             is_siri = any(x in v_id for x in ["siri", "ttsvoice", "aaron", "nicky", "martha", "arthur", "helena"]) or "siri" in name.lower()
             is_personal = "personalvoice" in v_id or "personal" in name.lower()
             
