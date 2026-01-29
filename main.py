@@ -445,7 +445,7 @@ class PDFReaderApp(ctk.CTk):
             if v['id'] in self.hidden_voice_ids: continue
             
             # DEFAULT FILTER: Always hide novelty/creepy voices
-            if v['is_novelty'] and not (v['is_siri'] or v['is_premium']): continue
+            if v['is_novelty']: continue
             
             # PREMIUM FILTER: If enabled, hide non-premium
             if premium_only and not v['is_premium']:
@@ -468,10 +468,12 @@ class PDFReaderApp(ctk.CTk):
         
         self.voices = list(voice_map.values())
         
-        # Fallback: if we filtered too aggressively and list is empty, show all non-novelty
+        # Fallback: if we filtered too aggressively and list is empty, turn off high quality filter
         if not self.voices and premium_only:
             self.premium_only_switch.deselect()
-            return self._refresh_voice_list()
+            # Important: recursion fallback to show SOMETHING
+            self.after(10, self._refresh_voice_list)
+            return
         
         # Sort: Personal Voice -> Siri -> Language -> Name
         self.voices.sort(key=lambda v: (
