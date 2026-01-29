@@ -2,18 +2,18 @@ from AVFoundation import (
     AVSpeechSynthesizer, 
     AVSpeechUtterance, 
     AVSpeechSynthesisVoice,
-    AVSpeechBoundaryImmediate,
-    AVSpeechSynthesizerDelegate
+    AVSpeechBoundaryImmediate
 )
 from Foundation import NSObject
 import time
 import os
 import re
+import objc
 from typing import List, Dict, Callable
 
 class TTSDelegate(NSObject):
     def initWithCallback_(self, callback: Callable):
-        self = super().init()
+        self = objc.super(TTSDelegate, self).init()
         if self:
             self._callback = callback
         return self
@@ -26,8 +26,9 @@ class TTSDelegate(NSObject):
 class TTSEngine:
     def __init__(self, on_word_callback=None):
         self._synth = AVSpeechSynthesizer.alloc().init()
-        self._delegate = TTSDelegate.alloc().initWithCallback_(on_word_callback)
-        self._synth.setDelegate_(self._delegate)
+        # Delegate disabled to prevent GIL threading crash
+        # self._delegate = TTSDelegate.alloc().initWithCallback_(on_word_callback)
+        # self._synth.setDelegate_(self._delegate)
         
         self._voice = None
         self._rate = 0.5 
