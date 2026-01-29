@@ -51,58 +51,57 @@ class PDFReaderApp(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        self.sidebar = ctk.CTkFrame(self, width=200, corner_radius=0)
+        self.sidebar = ctk.CTkFrame(self, width=220, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
 
-        self.logo_label = ctk.CTkLabel(self.sidebar, text="PDF Speaker", font=ctk.CTkFont(size=20, weight="bold"))
-        self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+        self.logo_label = ctk.CTkLabel(self.sidebar, text="PDF SPEAKER", font=ctk.CTkFont(family="System", size=22, weight="bold"))
+        self.logo_label.grid(row=0, column=0, padx=20, pady=(30, 20))
 
-        self.open_button = ctk.CTkButton(self.sidebar, text="Open PDF", command=self._open_file)
+        self.open_button = ctk.CTkButton(self.sidebar, text="📂 Open PDF", height=35, command=self._open_file)
         self.open_button.grid(row=1, column=0, padx=20, pady=10)
 
-        self.play_button = ctk.CTkButton(self.sidebar, text="Play", command=self._play)
-        self.play_button.grid(row=2, column=0, padx=20, pady=10)
+        self.controls_label = ctk.CTkLabel(self.sidebar, text="PLAYBACK CONTROL", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray")
+        self.controls_label.grid(row=2, column=0, padx=20, pady=(20, 5))
 
-        self.pause_button = ctk.CTkButton(self.sidebar, text="Pause", command=self._pause)
-        self.pause_button.grid(row=3, column=0, padx=20, pady=10)
+        self.play_btn_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.play_btn_frame.grid(row=3, column=0, padx=20, pady=5)
+        
+        self.play_button = ctk.CTkButton(self.play_btn_frame, text="▶ Play", width=85, height=35, fg_color="#2ecc71", hover_color="#27ae60", command=self._play)
+        self.play_button.grid(row=0, column=0, padx=(0, 5))
 
-        self.stop_button = ctk.CTkButton(self.sidebar, text="Stop", command=self._stop)
+        self.pause_button = ctk.CTkButton(self.play_btn_frame, text="⏸ Pause", width=85, height=35, command=self._pause)
+        self.pause_button.grid(row=0, column=1, padx=(5, 0))
+
+        self.stop_button = ctk.CTkButton(self.sidebar, text="⏹ Stop", height=35, fg_color="#e74c3c", hover_color="#c0392b", command=self._stop)
         self.stop_button.grid(row=4, column=0, padx=20, pady=10)
 
+        self.nav_label = ctk.CTkLabel(self.sidebar, text="NAVIGATION", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray")
+        self.nav_label.grid(row=5, column=0, padx=20, pady=(20, 5))
+
         self.nav_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        self.nav_frame.grid(row=5, column=0, padx=20, pady=10)
+        self.nav_frame.grid(row=6, column=0, padx=20, pady=5)
         
-        self.prev_page_btn = ctk.CTkButton(self.nav_frame, text="< Page", width=65, command=self._prev_page)
+        self.prev_page_btn = ctk.CTkButton(self.nav_frame, text="← Prev", width=85, command=self._prev_page)
         self.prev_page_btn.grid(row=0, column=0, padx=(0, 5))
         
-        self.next_page_btn = ctk.CTkButton(self.nav_frame, text="Page >", width=65, command=self._next_page)
+        self.next_page_btn = ctk.CTkButton(self.nav_frame, text="Next →", width=85, command=self._next_page)
         self.next_page_btn.grid(row=0, column=1, padx=(5, 0))
 
-        self.goto_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        self.goto_frame.grid(row=6, column=0, padx=20, pady=5)
-        
-        self.page_entry = ctk.CTkEntry(self.goto_frame, placeholder_text="Page #", width=80)
-        self.page_entry.grid(row=0, column=0, padx=(0, 5))
-        self.page_entry.bind("<Return>", lambda e: self._go_to_page())
-        
-        self.goto_btn = ctk.CTkButton(self.goto_frame, text="Go", width=50, command=self._go_to_page)
-        self.goto_btn.grid(row=0, column=1, padx=(5, 0))
+        self.settings_label = ctk.CTkLabel(self.sidebar, text="SETTINGS", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray")
+        self.settings_label.grid(row=7, column=0, padx=20, pady=(20, 5))
 
-        self.speed_label = ctk.CTkLabel(self.sidebar, text="Speed: 1.0x")
-        self.speed_label.grid(row=7, column=0, padx=20, pady=(15, 0))
+        self.speed_label = ctk.CTkLabel(self.sidebar, text="Reading Speed: 1.0x", font=ctk.CTkFont(size=12))
+        self.speed_label.grid(row=8, column=0, padx=20, pady=(5, 0))
         self.speed_slider = ctk.CTkSlider(self.sidebar, from_=0.5, to=3.0, number_of_steps=25, command=self._on_speed_change)
         self.speed_slider.set(1.0)
-        self.speed_slider.grid(row=8, column=0, padx=20, pady=10)
+        self.speed_slider.grid(row=9, column=0, padx=20, pady=5)
 
-        self.voice_label = ctk.CTkLabel(self.sidebar, text="Voice:")
-        self.voice_label.grid(row=9, column=0, padx=20, pady=(15, 0))
-        
         self.voices = self.tts_engine.get_voices()
         self.voices.sort(key=lambda v: ("siri" not in v['name'].lower() and "siri" not in v['id'].lower()))
         
         self.voice_names = [v['name'] for v in self.voices]
         self.voice_menu = ctk.CTkOptionMenu(self.sidebar, values=self.voice_names, command=self._on_voice_change)
-        self.voice_menu.grid(row=10, column=0, padx=20, pady=10)
+        self.voice_menu.grid(row=10, column=0, padx=20, pady=20)
 
         siri_voice = next((v for v in self.voices if "siri" in v['name'].lower()), None)
         if siri_voice:
