@@ -11,6 +11,7 @@
     Powered by your Mac's built-in neural Siri voices, PDF Speaker provides a high-quality "listen-while-reading" experience with synchronized highlighting and smart text processing.
 
     **Key Features**:
+    - **Personal PDF Library**: Add multiple books and documents to your local library. Switch between them instantly with independent progress tracking—the app always remembers your exact page for every book.
     - **Premium Neural Voices**: Access Siri's best voices for free, offline, with no character limits.
     - **Voice Customization**: Hide voices you don't like and preview voices with a single click to find your perfect narrator.
     - **Bookmarks & Annotations**: Save noteworthy pages with custom notes to revisit your research or favorite chapters later.

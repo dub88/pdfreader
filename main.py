@@ -37,6 +37,7 @@ class PDFReaderApp(ctk.CTk):
         # New State
         self.hidden_voice_ids = set()
         self.bookmarks = {} # { "pdf_path": [ {"page": 5, "note": "..."} ] }
+        self.library = {} # { "pdf_path": { "page": 1, "title": "..." } }
         
         # UI Setup
         self._setup_ui()
@@ -64,9 +65,19 @@ class PDFReaderApp(ctk.CTk):
 
         self.tabview = ctk.CTkTabview(self.sidebar, width=220)
         self.tabview.pack(padx=10, pady=10, expand=True, fill="both")
+        self.tabview.add("Library")
         self.tabview.add("Controls")
         self.tabview.add("Bookmarks")
         
+        # --- TAB: LIBRARY ---
+        self.lib_tab = self.tabview.tab("Library")
+        
+        self.lib_add_btn = ctk.CTkButton(self.lib_tab, text="➕ Add to Library", command=self._open_file)
+        self.lib_add_btn.pack(padx=10, pady=10, fill="x")
+        
+        self.lib_scroll = ctk.CTkScrollableFrame(self.lib_tab, label_text="My Books")
+        self.lib_scroll.pack(padx=5, pady=5, expand=True, fill="both")
+
         # --- TAB: CONTROLS ---
         self.ctrl_tab = self.tabview.tab("Controls")
         
@@ -213,13 +224,28 @@ class PDFReaderApp(ctk.CTk):
         threading.Thread(target=extract, daemon=True).start()
 
     def _on_pdf_loaded(self):
-        self.status_label.configure(text=f"Loaded: {os.path.basename(self.current_pdf_path)}")
+        # Update library with this PDF if not already present
+        if self.current_pdf_path not in self.library:
+            self.library[self.current_pdf_path] = {
+                "page": self.current_page_num,
+                "title": os.path.basename(self.current_pdf_path)
+            }
+        else:
+            # If already in library, use the saved page number
+            self.current_page_num = self.library[self.current_pdf_path].get("page", 1)
+
+        self.status_label.configure(text=f"Loaded: {self.library[self.current_pdf_path]['title']}")
         self._load_page_data(self.current_page_num)
         self._refresh_bookmark_list()
+        self._refresh_library_list()
         self._save_config()
 
     def _load_page_data(self, page_num):
         self.current_page_num = page_num
+        # Update current page in library state
+        if self.current_pdf_path in self.library:
+            self.library[self.current_pdf_path]["page"] = page_num
+            
         self.current_page_blocks = self.pdf_engine.get_page_data(page_num)
         self.current_block_index = 0
         if self.page_info_label:
@@ -372,6 +398,45 @@ class PDFReaderApp(ctk.CTk):
         voice = self.voices[idx]
         self.tts_engine.preview(voice['id'])
 
+    def _refresh_library_list(self):
+        for widget in self.lib_scroll.winfo_children():
+            widget.destroy()
+            
+        if not self.library:
+            label = ctk.CTkLabel(self.lib_scroll, text="Library is empty", font=ctk.CTkFont(slant="italic"))
+            label.pack(pady=20)
+            return
+            
+        for path, info in self.library.items():
+            if not os.path.exists(path): continue
+            
+            frame = ctk.CTkFrame(self.lib_scroll, fg_color="transparent")
+            frame.pack(fill="x", pady=2)
+            
+            # Highlight current book
+            is_active = (path == self.current_pdf_path)
+            btn_color = ("#3a7ebf", "#1f538d") if is_active else None
+            
+            btn = ctk.CTkButton(frame, text=f"{info['title']}\n(Page {info['page']})", 
+                               anchor="w", height=45, fg_color=btn_color,
+                               font=ctk.CTkFont(size=11),
+                               command=lambda p=path: self._load_pdf(p))
+            btn.pack(side="left", fill="x", expand=True, padx=(0, 2))
+            
+            del_btn = ctk.CTkButton(frame, text="×", width=25, height=45, fg_color="transparent", 
+                                   hover_color="#e74c3c", command=lambda p=path: self._remove_from_library(p))
+            del_btn.pack(side="right")
+
+    def _remove_from_library(self, path):
+        if path in self.library:
+            del self.library[path]
+            if path == self.current_pdf_path:
+                self.current_pdf_path = None
+                self.pdf_engine = None
+                self.canvas.delete("all")
+            self._refresh_library_list()
+            self._save_config()
+
     def _hide_current_voice(self):
         current_voice_display = self.voice_menu.get()
         if not current_voice_display: return
@@ -475,10 +540,12 @@ class PDFReaderApp(ctk.CTk):
                     config = json.load(f)
                     self.hidden_voice_ids = set(config.get("hidden_voices", []))
                     self.bookmarks = config.get("bookmarks", {})
+                    self.library = config.get("library", {})
                     self._refresh_voice_list()
+                    self._refresh_library_list()
                     
                     if config.get("last_pdf") and os.path.exists(config["last_pdf"]):
-                        self.current_page_num = config.get("last_page", 1)
+                        # _load_pdf will use the page number from library state
                         self._load_pdf(config["last_pdf"])
             except: pass
 
@@ -489,7 +556,8 @@ class PDFReaderApp(ctk.CTk):
                     "last_pdf": self.current_pdf_path, 
                     "last_page": self.current_page_num,
                     "hidden_voices": list(self.hidden_voice_ids),
-                    "bookmarks": self.bookmarks
+                    "bookmarks": self.bookmarks,
+                    "library": self.library
                 }
                 json.dump(config, f)
         except: pass
