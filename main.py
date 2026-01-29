@@ -8,14 +8,12 @@ from tts_engine import TTSEngine
 import threading
 import darkdetect
 import time
-from AppKit import NSView, NSVisualEffectView, NSVisualEffectBlendingModeBehindWindow, NSVisualEffectMaterialSidebar, NSWindow
-import objc
 
-class AudionApp(ctk.CTk):
+class AudileApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Audion - Professional PDF Reader")
+        self.title("Audile - Native macOS PDF Reader")
         self.geometry("1100x750")
         
         # Initialize engines
@@ -23,7 +21,7 @@ class AudionApp(ctk.CTk):
         self.tts_engine = TTSEngine()
         
         # State
-        self.config_file = os.path.expanduser("~/.audion_config.json")
+        self.config_file = os.path.expanduser("~/.audile_config.json")
         self.current_pdf_path = None
         
         self.current_page_blocks = []
@@ -62,12 +60,12 @@ class AudionApp(ctk.CTk):
         self.sidebar = ctk.CTkFrame(self, width=280, corner_radius=0, fg_color=("#F2F2F7", "#1C1C1E"))
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         
-        self.logo_label = ctk.CTkLabel(self.sidebar, text="Audion", text_color=("#FA2D48", "#FA2D48"),
-                                       font=ctk.CTkFont(family="SF Pro Display", size=28, weight="bold"))
+        self.logo_label = ctk.CTkLabel(self.sidebar, text="Audile", text_color=("#FA2D48", "#FA2D48"),
+                                       font=ctk.CTkFont(family="SF Pro Display", size=32, weight="bold"))
         self.logo_label.pack(padx=20, pady=(40, 20))
 
         self.tabview = ctk.CTkTabview(self.sidebar, width=250, 
-                                      segmented_button_fg_color=None,
+                                      segmented_button_fg_color="transparent",
                                       segmented_button_selected_color=("#FA2D48", "#FA2D48"),
                                       segmented_button_selected_hover_color=("#D41C33", "#D41C33"),
                                       segmented_button_unselected_color=("#8E8E93", "#8E8E93"))
@@ -82,12 +80,12 @@ class AudionApp(ctk.CTk):
         self.lib_add_btn = ctk.CTkButton(self.lib_tab, text="➕ Add Document", height=45, 
                                          corner_radius=12, fg_color=("#FA2D48", "#FA2D48"), 
                                          hover_color=("#D41C33", "#D41C33"),
-                                         font=ctk.CTkFont(weight="bold"), 
+                                         font=ctk.CTkFont(family="SF Pro Text", size=13, weight="bold"), 
                                          command=self._open_file)
         self.lib_add_btn.pack(padx=10, pady=10, fill="x")
         
         self.lib_scroll = ctk.CTkScrollableFrame(self.lib_tab, label_text="My Collection", 
-                                                 fg_color="transparent", label_font=ctk.CTkFont(size=12, weight="bold"))
+                                                 fg_color="transparent", label_font=ctk.CTkFont(family="SF Pro Text", size=12, weight="bold"))
         self.lib_scroll.pack(padx=5, pady=5, expand=True, fill="both")
 
         # --- TAB: PLAYING ---
@@ -97,7 +95,7 @@ class AudionApp(ctk.CTk):
         self.playback_pod = ctk.CTkFrame(self.ctrl_tab, fg_color=("#FFFFFF", "#2C2C2E"), corner_radius=18)
         self.playback_pod.pack(padx=10, pady=10, fill="x")
 
-        self.pod_label = ctk.CTkLabel(self.playback_pod, text="NOW READING", font=ctk.CTkFont(size=10, weight="bold"), text_color="#8E8E93")
+        self.pod_label = ctk.CTkLabel(self.playback_pod, text="NOW READING", font=ctk.CTkFont(family="SF Pro Text", size=10, weight="bold"), text_color="#8E8E93")
         self.pod_label.pack(pady=(15, 0))
 
         self.play_btn_frame = ctk.CTkFrame(self.playback_pod, fg_color="transparent")
@@ -123,50 +121,79 @@ class AudionApp(ctk.CTk):
                                            fg_color="transparent", text_color=("#000000", "#FFFFFF"), border_width=1, command=self._prev_page)
         self.prev_page_btn.pack(side="left", padx=(0, 5))
         
-        self.page_info_label = ctk.CTkLabel(self.nav_frame, text="0 / 0", font=ctk.CTkFont(size=14, weight="bold"))
+        self.page_info_label = ctk.CTkLabel(self.nav_frame, text="0 / 0", font=ctk.CTkFont(family="SF Pro Text", size=14, weight="bold"))
         self.page_info_label.pack(side="left", expand=True)
 
         self.next_page_btn = ctk.CTkButton(self.nav_frame, text="⏩", width=50, height=40, corner_radius=10, 
                                            fg_color="transparent", text_color=("#000000", "#FFFFFF"), border_width=1, command=self._next_page)
         self.next_page_btn.pack(side="left", padx=(5, 0))
 
-        # Speed Slider (Apple Music Volume Style)
-        self.speed_label = ctk.CTkLabel(self.ctrl_tab, text="Reading Speed", font=ctk.CTkFont(size=11, weight="bold"), text_color="#8E8E93")
-        self.speed_label.pack(padx=10, pady=(15, 0))
+        # Speed Slider (Apple Music Style)
+        self.speed_info_frame = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
+        self.speed_info_frame.pack(padx=10, pady=(15, 0), fill="x")
+        
+        self.speed_label = ctk.CTkLabel(self.speed_info_frame, text="Reading Speed", font=ctk.CTkFont(family="SF Pro Text", size=11, weight="bold"), text_color="#8E8E93")
+        self.speed_label.pack(side="left")
+        
+        self.speed_value_label = ctk.CTkLabel(self.speed_info_frame, text="1.0x", font=ctk.CTkFont(family="SF Pro Text", size=11, weight="bold"), text_color="#FA2D48")
+        self.speed_value_label.pack(side="right")
+
         self.speed_slider = ctk.CTkSlider(self.ctrl_tab, from_=0.5, to=3.0, number_of_steps=25, 
                                           button_color="#FA2D48", button_hover_color="#D41C33",
                                           command=self._on_speed_change)
         self.speed_slider.set(1.0)
         self.speed_slider.pack(padx=10, pady=10, fill="x")
 
-        self.voice_label = ctk.CTkLabel(self.ctrl_tab, text="NARRATOR", font=ctk.CTkFont(size=11, weight="bold"), text_color="#8E8E93")
+        self.voice_label = ctk.CTkLabel(self.ctrl_tab, text="NARRATOR", font=ctk.CTkFont(family="SF Pro Text", size=11, weight="bold"), text_color="#8E8E93")
         self.voice_label.pack(padx=10, pady=(20, 5))
         
         self.voice_menu = ctk.CTkOptionMenu(self.ctrl_tab, values=[], height=35, corner_radius=10, 
                                             fg_color=("#E5E5EA", "#2C2C2E"), text_color=("#000000", "#FFFFFF"),
-                                            button_color=("#D1D1D6", "#3A3A3C"), command=self._on_voice_change)
+                                            button_color=("#D1D1D6", "#3A3A3C"), font=ctk.CTkFont(family="SF Pro Text", size=12),
+                                            command=self._on_voice_change)
         self.voice_menu.pack(padx=10, pady=5, fill="x")
 
         self.voice_action_frame = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
         self.voice_action_frame.pack(padx=10, pady=5, fill="x")
 
-        self.preview_btn = ctk.CTkButton(self.voice_action_frame, text="🔊 Preview", width=80, height=35, corner_radius=8, 
-                                         fg_color="transparent", border_width=1, command=self._preview_voice)
+        self.preview_btn = ctk.CTkButton(self.voice_action_frame, text="🔊 Preview", width=80, height=35, corner_radius=10, 
+                                         fg_color="transparent", border_width=1, font=ctk.CTkFont(family="SF Pro Text", size=11),
+                                         command=self._preview_voice)
         self.preview_btn.pack(side="left", padx=(0, 2), expand=True, fill="x")
 
-        self.premium_only_switch = ctk.CTkSwitch(self.ctrl_tab, text="Premium Only", progress_color="#FA2D48", command=self._refresh_voice_list)
+        self.hide_voice_btn = ctk.CTkButton(self.voice_action_frame, text="👁 Hide", width=80, height=35, corner_radius=10, 
+                                            fg_color="transparent", border_width=1, font=ctk.CTkFont(family="SF Pro Text", size=11),
+                                            command=self._hide_current_voice)
+        self.hide_voice_btn.pack(side="left", padx=(2, 0), expand=True, fill="x")
+        
+        self.premium_only_switch = ctk.CTkSwitch(self.ctrl_tab, text="Premium Only", font=ctk.CTkFont(family="SF Pro Text", size=12),
+                                                progress_color="#FA2D48", command=self._refresh_voice_list)
         self.premium_only_switch.select()
         self.premium_only_switch.pack(padx=10, pady=15)
+
+        # Bottom Utility Links
+        self.util_frame = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
+        self.util_frame.pack(side="bottom", pady=10, fill="x")
+
+        self.download_help_btn = ctk.CTkButton(self.util_frame, text="❓ Missing Voices?", height=25, 
+                                               font=ctk.CTkFont(family="SF Pro Text", size=10), fg_color="transparent", command=self._show_voice_help)
+        self.download_help_btn.pack(padx=10, pady=2)
+
+        self.manage_voices_btn = ctk.CTkButton(self.util_frame, text="↺ Reset Hidden", height=25, 
+                                               font=ctk.CTkFont(family="SF Pro Text", size=10), fg_color="transparent", command=self._reset_hidden_voices)
+        self.manage_voices_btn.pack(padx=10, pady=2)
 
         # --- TAB: NOTES ---
         self.bmk_tab = self.tabview.tab("Notes")
         
-        self.add_bmk_btn = ctk.CTkButton(self.bmk_tab, text="🔖 New Annotation", corner_radius=10, 
+        self.add_bmk_btn = ctk.CTkButton(self.bmk_tab, text="🔖 New Annotation", corner_radius=12, height=40,
                                          fg_color=("#FA2D48", "#FA2D48"), hover_color=("#D41C33", "#D41C33"),
+                                         font=ctk.CTkFont(family="SF Pro Text", size=13, weight="bold"),
                                          command=self._add_bookmark)
         self.add_bmk_btn.pack(padx=10, pady=10, fill="x")
         
-        self.bmk_scroll = ctk.CTkScrollableFrame(self.bmk_tab, label_text="Your Highlights", fg_color="transparent")
+        self.bmk_scroll = ctk.CTkScrollableFrame(self.bmk_tab, label_text="Your Highlights", fg_color="transparent",
+                                                 label_font=ctk.CTkFont(family="SF Pro Text", size=12, weight="bold"))
         self.bmk_scroll.pack(padx=5, pady=5, expand=True, fill="both")
 
         # --- MAIN CONTENT ---
@@ -180,21 +207,22 @@ class AudionApp(ctk.CTk):
         self.canvas_frame.grid_columnconfigure(0, weight=1)
         self.canvas_frame.grid_rowconfigure(0, weight=1)
 
-        bg_color = "#1E1E1E" if darkdetect.isDark() else "#F2F2F7"
-        self.canvas = tk.Canvas(self.canvas_frame, bg=bg_color, highlightthickness=0)
-        self.canvas.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        # Background color selection for canvas
+        self.canvas_bg = "#F2F2F7" if darkdetect.isLight() else "#1E1E1E"
+        self.canvas = tk.Canvas(self.canvas_frame, bg=self.canvas_bg, highlightthickness=0)
+        self.canvas.grid(row=0, column=0, sticky="nsew", padx=15, pady=15)
         
         self.v_scrollbar = ctk.CTkScrollbar(self.canvas_frame, orientation="vertical", command=self.canvas.yview)
-        self.v_scrollbar.grid(row=0, column=1, sticky="ns", pady=10)
+        self.v_scrollbar.grid(row=0, column=1, sticky="ns", pady=15)
         self.h_scrollbar = ctk.CTkScrollbar(self.canvas_frame, orientation="horizontal", command=self.canvas.xview)
-        self.h_scrollbar.grid(row=1, column=0, sticky="ew", padx=10)
+        self.h_scrollbar.grid(row=1, column=0, sticky="ew", padx=15)
         self.canvas.configure(yscrollcommand=self.v_scrollbar.set, xscrollcommand=self.h_scrollbar.set)
 
         self.progress_bar = ctk.CTkProgressBar(self.content_frame, height=8, corner_radius=4, progress_color="#FA2D48")
         self.progress_bar.grid(row=1, column=0, padx=30, pady=(0, 25), sticky="ew")
         self.progress_bar.set(0)
 
-        self.status_label = ctk.CTkLabel(self, text="Audion Ready", anchor="w", font=ctk.CTkFont(size=11), text_color="#8E8E93")
+        self.status_label = ctk.CTkLabel(self, text="Ready to listen", anchor="w", font=ctk.CTkFont(family="SF Pro Text", size=11), text_color="#8E8E93")
         self.status_label.grid(row=1, column=1, padx=30, pady=(0, 10), sticky="ew")
         
         self._refresh_voice_list()
@@ -234,7 +262,7 @@ class AudionApp(ctk.CTk):
         else:
             self.current_page_num = self.library[self.current_pdf_path].get("page", 1)
 
-        self.status_label.configure(text=f"Playing: {self.library[self.current_pdf_path]['title']}")
+        self.status_label.configure(text=f"Now Reading: {self.library[self.current_pdf_path]['title']}")
         self._load_page_data(self.current_page_num)
         self._refresh_bookmark_list()
         self._refresh_library_list()
@@ -270,7 +298,9 @@ class AudionApp(ctk.CTk):
             img_w, img_h = self.current_tk_img.width(), self.current_tk_img.height()
             x_off = max(30, (canvas_width - img_w) // 2)
             self.canvas.create_image(x_off, 30, anchor="nw", image=self.current_tk_img, tags="page")
-            self.canvas.create_rectangle(x_off-1, 29, x_off+img_w+1, img_h+31, outline="#CCCCCC" if darkdetect.isLight() else "#333333", tags="border")
+            
+            border_color = "#CCCCCC" if darkdetect.isLight() else "#333333"
+            self.canvas.create_rectangle(x_off-1, 29, x_off+img_w+1, img_h+31, outline=border_color, tags="border")
             self.canvas.config(scrollregion=(0, 0, max(canvas_width, img_w + x_off*2), img_h + 80))
             self.current_page_rendered = self.current_page_num
 
@@ -288,7 +318,6 @@ class AudionApp(ctk.CTk):
         if not coords: return
         x_off, y_off = coords[0], coords[1]
         
-        # Apple Music Style Accent Highlight
         self.canvas.create_rectangle(bbox[0]*z + x_off, bbox[1]*z + y_off, 
                                    bbox[2]*z + x_off, bbox[3]*z + y_off, 
                                    outline="#FA2D48", width=3, tags="highlight")
@@ -306,7 +335,7 @@ class AudionApp(ctk.CTk):
     def _play(self):
         if not self.current_page_blocks: return
         self.is_playing = True
-        self.play_button.configure(text="■", font=ctk.CTkFont(size=24)) # Stop icon for play button when active
+        self.play_button.configure(text="■", font=ctk.CTkFont(size=24)) 
         if self.tts_engine.is_paused: 
             self.tts_engine.resume()
         else:
@@ -344,7 +373,7 @@ class AudionApp(ctk.CTk):
         else:
             self.is_playing = False
             self.play_button.configure(text="▶", font=ctk.CTkFont(size=20))
-            self.after(0, lambda: self.status_label.configure(text="Listening Session Finished"))
+            self.after(0, lambda: self.status_label.configure(text="Playback Finished"))
 
     def _pause(self): 
         self.tts_engine.pause()
@@ -376,7 +405,7 @@ class AudionApp(ctk.CTk):
         self._save_config()
 
     def _on_speed_change(self, v):
-        self.speed_slider.configure(button_color="#FA2D48") # Ensure color stays
+        self.speed_value_label.configure(text=f"{v:.1f}x")
         self.tts_engine.set_rate(v)
 
     def _on_voice_change(self, display_name):
@@ -400,13 +429,12 @@ class AudionApp(ctk.CTk):
             widget.destroy()
             
         if not self.library:
-            label = ctk.CTkLabel(self.lib_scroll, text="No items in library.", font=ctk.CTkFont(slant="italic"))
+            label = ctk.CTkLabel(self.lib_scroll, text="Library empty.", font=ctk.CTkFont(family="SF Pro Text", slant="italic"))
             label.pack(pady=30)
             return
             
         for path, info in self.library.items():
             if not os.path.exists(path): continue
-            
             frame = ctk.CTkFrame(self.lib_scroll, fg_color="transparent")
             frame.pack(fill="x", pady=4, padx=5)
             
@@ -415,13 +443,13 @@ class AudionApp(ctk.CTk):
             txt_color = ("#FFFFFF", "#FFFFFF") if is_active else ("#000000", "#FFFFFF")
             
             btn = ctk.CTkButton(frame, text=f"{info['title']}\nPage {info['page']}", 
-                               anchor="w", height=60, corner_radius=15,
+                               anchor="w", height=65, corner_radius=15,
                                fg_color=btn_color, text_color=txt_color,
-                               font=ctk.CTkFont(size=12, weight="bold"),
+                               font=ctk.CTkFont(family="SF Pro Text", size=12, weight="bold"),
                                command=lambda p=path: self._load_pdf(p))
             btn.pack(side="left", fill="x", expand=True, padx=(0, 5))
             
-            del_btn = ctk.CTkButton(frame, text="×", width=35, height=60, corner_radius=15,
+            del_btn = ctk.CTkButton(frame, text="×", width=35, height=65, corner_radius=15,
                                    fg_color="transparent", border_width=1, border_color="#FA2D48",
                                    text_color="#FA2D48", hover_color=("#FA2D48", "#450A0A"),
                                    command=lambda p=path: self._remove_from_library(p))
@@ -454,8 +482,8 @@ class AudionApp(ctk.CTk):
         self._save_config()
 
     def _show_voice_help(self):
-        messagebox.showinfo("Voice Catalog", 
-            "To unlock premium narrators on your Mac:\n\n"
+        messagebox.showinfo("Audile Voice Guide", 
+            "For the best experience, download Enhanced voices:\n\n"
             "1. System Settings > Accessibility > Spoken Content\n"
             "2. Click 'i' next to System Voice\n"
             "3. Manage Voices > Download 'Enhanced' versions.\n\n"
@@ -512,7 +540,7 @@ class AudionApp(ctk.CTk):
 
     def _add_bookmark(self):
         if not self.current_pdf_path: return
-        dialog = ctk.CTkInputDialog(text="New Annotation:", title="Audion Notes")
+        dialog = ctk.CTkInputDialog(text="Annotate this moment:", title="Audile Notes")
         note = dialog.get_input()
         if note is None: return 
         
@@ -532,7 +560,7 @@ class AudionApp(ctk.CTk):
             widget.destroy()
             
         if not self.current_pdf_path or self.current_pdf_path not in self.bookmarks:
-            label = ctk.CTkLabel(self.bmk_scroll, text="No notes found.", font=ctk.CTkFont(slant="italic"))
+            label = ctk.CTkLabel(self.bmk_scroll, text="No notes for this book.", font=ctk.CTkFont(family="SF Pro Text", slant="italic"))
             label.pack(pady=30)
             return
             
@@ -544,7 +572,7 @@ class AudionApp(ctk.CTk):
             
             btn = ctk.CTkButton(frame, text=f"P{b['page']}: {b['note'][:25]}", 
                                anchor="w", height=40, fg_color="transparent", text_color=("#000000", "#FFFFFF"),
-                               font=ctk.CTkFont(size=12, weight="bold"),
+                               font=ctk.CTkFont(family="SF Pro Text", size=12, weight="bold"),
                                command=lambda p=b['page']: self._jump_to_page(p))
             btn.pack(side="left", fill="x", expand=True, padx=5)
             
@@ -592,5 +620,5 @@ class AudionApp(ctk.CTk):
         except: pass
 
 if __name__ == "__main__":
-    app = AudionApp()
+    app = AudileApp()
     app.mainloop()
