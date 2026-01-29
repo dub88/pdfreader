@@ -13,7 +13,7 @@ class AudileApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Audile - Native macOS PDF Reader")
+        self.title("Audile - Professional Audio Reader")
         self.geometry("1100x750")
         
         # Initialize engines
@@ -34,7 +34,7 @@ class AudileApp(ctk.CTk):
         self.zoom_factor = 1.0
         self.current_tk_img = None
         
-        # New State
+        # Persistence State
         self.hidden_voice_ids = set()
         self.bookmarks = {} 
         self.library = {} 
@@ -56,13 +56,13 @@ class AudileApp(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        # --- SIDEBAR (Apple Music Style) ---
+        # --- SIDEBAR (Apple Music Aesthetic) ---
         self.sidebar = ctk.CTkFrame(self, width=280, corner_radius=0, fg_color=("#F2F2F7", "#1C1C1E"))
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         
         self.logo_label = ctk.CTkLabel(self.sidebar, text="Audile", text_color=("#FA2D48", "#FA2D48"),
-                                       font=ctk.CTkFont(family="SF Pro Display", size=32, weight="bold"))
-        self.logo_label.pack(padx=20, pady=(40, 20))
+                                       font=ctk.CTkFont(family="SF Pro Display", size=34, weight="bold"))
+        self.logo_label.pack(padx=20, pady=(40, 10))
 
         self.tabview = ctk.CTkTabview(self.sidebar, width=250, 
                                       segmented_button_fg_color=None,
@@ -91,7 +91,7 @@ class AudileApp(ctk.CTk):
         # --- TAB: PLAYING ---
         self.ctrl_tab = self.tabview.tab("Playing")
         
-        # Floating-style Apple Music Playback Pod
+        # Playback Control Pod
         self.playback_pod = ctk.CTkFrame(self.ctrl_tab, fg_color=("#FFFFFF", "#2C2C2E"), corner_radius=18)
         self.playback_pod.pack(padx=10, pady=10, fill="x")
 
@@ -113,9 +113,9 @@ class AudileApp(ctk.CTk):
                                           command=self._pause)
         self.pause_button.pack(side="left")
 
-        # Navigation Bar
+        # Navigation
         self.nav_frame = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
-        self.nav_frame.pack(padx=10, pady=15, fill="x")
+        self.nav_frame.pack(padx=10, pady=10, fill="x")
         
         self.prev_page_btn = ctk.CTkButton(self.nav_frame, text="⏪", width=50, height=40, corner_radius=10, 
                                            fg_color="transparent", text_color=("#000000", "#FFFFFF"), border_width=1, command=self._prev_page)
@@ -128,7 +128,7 @@ class AudileApp(ctk.CTk):
                                            fg_color="transparent", text_color=("#000000", "#FFFFFF"), border_width=1, command=self._next_page)
         self.next_page_btn.pack(side="left", padx=(5, 0))
 
-        # Speed Slider (Apple Music Style)
+        # Config Settings
         self.speed_info_frame = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
         self.speed_info_frame.pack(padx=10, pady=(15, 0), fill="x")
         
@@ -145,7 +145,7 @@ class AudileApp(ctk.CTk):
         self.speed_slider.pack(padx=10, pady=10, fill="x")
 
         self.voice_label = ctk.CTkLabel(self.ctrl_tab, text="NARRATOR", font=ctk.CTkFont(family="SF Pro Text", size=11, weight="bold"), text_color="#8E8E93")
-        self.voice_label.pack(padx=10, pady=(20, 5))
+        self.voice_label.pack(padx=10, pady=(15, 5))
         
         self.voice_menu = ctk.CTkOptionMenu(self.ctrl_tab, values=[], height=35, corner_radius=10, 
                                             fg_color=("#E5E5EA", "#2C2C2E"), text_color=("#000000", "#FFFFFF"),
@@ -171,17 +171,13 @@ class AudileApp(ctk.CTk):
         self.premium_only_switch.select()
         self.premium_only_switch.pack(padx=10, pady=15)
 
-        # Bottom Utility Links
+        # Bottom Utility
         self.util_frame = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
         self.util_frame.pack(side="bottom", pady=10, fill="x")
 
-        self.download_help_btn = ctk.CTkButton(self.util_frame, text="❓ Missing Voices?", height=25, 
+        self.download_help_btn = ctk.CTkButton(self.util_frame, text="❓ Help & Voices", height=25, 
                                                font=ctk.CTkFont(family="SF Pro Text", size=10), fg_color="transparent", command=self._show_voice_help)
         self.download_help_btn.pack(padx=10, pady=2)
-
-        self.manage_voices_btn = ctk.CTkButton(self.util_frame, text="↺ Reset Hidden", height=25, 
-                                               font=ctk.CTkFont(family="SF Pro Text", size=10), fg_color="transparent", command=self._reset_hidden_voices)
-        self.manage_voices_btn.pack(padx=10, pady=2)
 
         # --- TAB: NOTES ---
         self.bmk_tab = self.tabview.tab("Notes")
@@ -207,7 +203,6 @@ class AudileApp(ctk.CTk):
         self.canvas_frame.grid_columnconfigure(0, weight=1)
         self.canvas_frame.grid_rowconfigure(0, weight=1)
 
-        # Background color selection for canvas
         self.canvas_bg = "#F2F2F7" if darkdetect.isLight() else "#1E1E1E"
         self.canvas = tk.Canvas(self.canvas_frame, bg=self.canvas_bg, highlightthickness=0)
         self.canvas.grid(row=0, column=0, sticky="nsew", padx=15, pady=15)
@@ -222,7 +217,7 @@ class AudileApp(ctk.CTk):
         self.progress_bar.grid(row=1, column=0, padx=30, pady=(0, 25), sticky="ew")
         self.progress_bar.set(0)
 
-        self.status_label = ctk.CTkLabel(self, text="Ready to listen", anchor="w", font=ctk.CTkFont(family="SF Pro Text", size=11), text_color="#8E8E93")
+        self.status_label = ctk.CTkLabel(self, text="Ready", anchor="w", font=ctk.CTkFont(family="SF Pro Text", size=11), text_color="#8E8E93")
         self.status_label.grid(row=1, column=1, padx=30, pady=(0, 10), sticky="ew")
         
         self._refresh_voice_list()
@@ -230,10 +225,30 @@ class AudileApp(ctk.CTk):
     def _open_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("PDF Files", "*.pdf")])
         if file_path:
-            self.current_page_num = 1
-            self._load_pdf(file_path)
+            # Show Document Type Dialog for Smart Extraction
+            self._select_doc_type(file_path)
 
-    def _load_pdf(self, file_path):
+    def _select_doc_type(self, file_path):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Import Document")
+        dialog.geometry("300x250")
+        dialog.grab_set() # Modal
+        
+        label = ctk.CTkLabel(dialog, text="Select Document Type", font=ctk.CTkFont(weight="bold"))
+        label.pack(pady=20)
+        
+        doc_type = tk.StringVar(value="Book")
+        
+        def set_and_load(val):
+            doc_type.set(val)
+            dialog.destroy()
+            self._load_pdf(file_path, val)
+
+        ctk.CTkButton(dialog, text="📖 Book", command=lambda: set_and_load("Book")).pack(pady=5, padx=20, fill="x")
+        ctk.CTkButton(dialog, text="🔬 Research Paper", command=lambda: set_and_load("Research")).pack(pady=5, padx=20, fill="x")
+        ctk.CTkButton(dialog, text="📑 Standard Document", command=lambda: set_and_load("Standard")).pack(pady=5, padx=20, fill="x")
+
+    def _load_pdf(self, file_path, doc_type="Book"):
         if self.is_loading: return
         self.status_label.configure(text=f"Syncing: {os.path.basename(file_path)}...")
         self.is_loading = True
@@ -244,7 +259,7 @@ class AudileApp(ctk.CTk):
                 if engine.open():
                     self.pdf_engine = engine
                     self.current_pdf_path = file_path
-                    self.after(0, self._on_pdf_loaded)
+                    self.after(0, lambda: self._on_pdf_loaded(doc_type))
                 else:
                     self.after(0, lambda: messagebox.showerror("Error", "Could not open PDF file."))
             except Exception as e:
@@ -253,16 +268,19 @@ class AudileApp(ctk.CTk):
                 self.is_loading = False
         threading.Thread(target=extract, daemon=True).start()
 
-    def _on_pdf_loaded(self):
+    def _on_pdf_loaded(self, doc_type):
         if self.current_pdf_path not in self.library:
             self.library[self.current_pdf_path] = {
                 "page": self.current_page_num,
-                "title": os.path.basename(self.current_pdf_path)
+                "title": os.path.basename(self.current_pdf_path),
+                "doc_type": doc_type
             }
         else:
             self.current_page_num = self.library[self.current_pdf_path].get("page", 1)
+            # Use saved doc_type if available
+            doc_type = self.library[self.current_pdf_path].get("doc_type", doc_type)
 
-        self.status_label.configure(text=f"Now Reading: {self.library[self.current_pdf_path]['title']}")
+        self.status_label.configure(text=f"Playing: {self.library[self.current_pdf_path]['title']}")
         self._load_page_data(self.current_page_num)
         self._refresh_bookmark_list()
         self._refresh_library_list()
@@ -270,10 +288,12 @@ class AudileApp(ctk.CTk):
 
     def _load_page_data(self, page_num):
         self.current_page_num = page_num
+        doc_type = "Book"
         if self.current_pdf_path in self.library:
             self.library[self.current_pdf_path]["page"] = page_num
+            doc_type = self.library[self.current_pdf_path].get("doc_type", "Book")
             
-        self.current_page_blocks = self.pdf_engine.get_page_data(page_num)
+        self.current_page_blocks = self.pdf_engine.get_page_data(page_num, doc_type=doc_type)
         self.current_block_index = 0
         if self.page_info_label:
             self.page_info_label.configure(text=f"{page_num} of {self.pdf_engine.total_pages}")
@@ -294,7 +314,7 @@ class AudileApp(ctk.CTk):
             self.current_img = self.pdf_engine.get_page_image(self.current_page_num, zoom=self.zoom_factor)
             if not self.current_img: return
             self.current_tk_img = ImageTk.PhotoImage(self.current_img)
-            self.canvas.delete("page", "border", "highlight")
+            self.canvas.delete("page", "border", "highlight", "overlay")
             img_w, img_h = self.current_tk_img.width(), self.current_tk_img.height()
             x_off = max(30, (canvas_width - img_w) // 2)
             self.canvas.create_image(x_off, 30, anchor="nw", image=self.current_tk_img, tags="page")
@@ -308,7 +328,7 @@ class AudileApp(ctk.CTk):
         self.progress_bar.set(self.current_page_num / self.pdf_engine.total_pages)
 
     def _highlight_current_block(self):
-        self.canvas.delete("highlight")
+        self.canvas.delete("highlight", "overlay")
         if not self.current_page_blocks or self.current_block_index >= len(self.current_page_blocks): 
             return
             
@@ -318,9 +338,19 @@ class AudileApp(ctk.CTk):
         if not coords: return
         x_off, y_off = coords[0], coords[1]
         
+        # --- NEW HIGH-FIDELITY HIGHLIGHT: "LINE FOCUS" ---
+        # Instead of just a box, we dim the surrounding text slightly and add an underline/side-glow
+        
+        # Side Indicator (Apple Music Style)
+        self.canvas.create_rectangle(x_off - 10, bbox[1]*z + y_off, 
+                                   x_off - 4, bbox[3]*z + y_off, 
+                                   fill="#FA2D48", outline="", tags="highlight")
+        
+        # Subtle Inset Highlight
         self.canvas.create_rectangle(bbox[0]*z + x_off, bbox[1]*z + y_off, 
                                    bbox[2]*z + x_off, bbox[3]*z + y_off, 
-                                   outline="#FA2D48", width=3, tags="highlight")
+                                   outline="#FA2D48", width=2, tags="highlight")
+                                   
         self._scroll_to_highlight(bbox[1]*z + y_off, bbox[3]*z + y_off)
 
     def _scroll_to_highlight(self, hy0, hy1):
@@ -334,6 +364,10 @@ class AudileApp(ctk.CTk):
 
     def _play(self):
         if not self.current_page_blocks: return
+        if self.is_playing:
+            self._stop()
+            return
+            
         self.is_playing = True
         self.play_button.configure(text="■", font=ctk.CTkFont(size=24)) 
         if self.tts_engine.is_paused: 
@@ -373,7 +407,7 @@ class AudileApp(ctk.CTk):
         else:
             self.is_playing = False
             self.play_button.configure(text="▶", font=ctk.CTkFont(size=20))
-            self.after(0, lambda: self.status_label.configure(text="Playback Finished"))
+            self.after(0, lambda: self.status_label.configure(text="Finished Reading"))
 
     def _pause(self): 
         self.tts_engine.pause()
@@ -429,7 +463,7 @@ class AudileApp(ctk.CTk):
             widget.destroy()
             
         if not self.library:
-            label = ctk.CTkLabel(self.lib_scroll, text="Library empty.", font=ctk.CTkFont(family="SF Pro Text", slant="italic"))
+            label = ctk.CTkLabel(self.lib_scroll, text="Add your first document to begin.", font=ctk.CTkFont(family="SF Pro Text", slant="italic"))
             label.pack(pady=30)
             return
             
@@ -442,14 +476,19 @@ class AudileApp(ctk.CTk):
             btn_color = ("#FA2D48", "#FA2D48") if is_active else ("#E5E5EA", "#2C2C2E")
             txt_color = ("#FFFFFF", "#FFFFFF") if is_active else ("#000000", "#FFFFFF")
             
-            btn = ctk.CTkButton(frame, text=f"{info['title']}\nPage {info['page']}", 
-                               anchor="w", height=65, corner_radius=15,
+            # Show doc type icon
+            icon = "📖"
+            if info.get("doc_type") == "Research": icon = "🔬"
+            elif info.get("doc_type") == "Standard": icon = "📑"
+
+            btn = ctk.CTkButton(frame, text=f"{icon} {info['title']}\nPage {info['page']}", 
+                               anchor="w", height=70, corner_radius=15,
                                fg_color=btn_color, text_color=txt_color,
                                font=ctk.CTkFont(family="SF Pro Text", size=12, weight="bold"),
                                command=lambda p=path: self._load_pdf(p))
             btn.pack(side="left", fill="x", expand=True, padx=(0, 5))
             
-            del_btn = ctk.CTkButton(frame, text="×", width=35, height=65, corner_radius=15,
+            del_btn = ctk.CTkButton(frame, text="×", width=35, height=70, corner_radius=15,
                                    fg_color="transparent", border_width=1, border_color="#FA2D48",
                                    text_color="#FA2D48", hover_color=("#FA2D48", "#450A0A"),
                                    command=lambda p=path: self._remove_from_library(p))
@@ -482,11 +521,10 @@ class AudileApp(ctk.CTk):
         self._save_config()
 
     def _show_voice_help(self):
-        messagebox.showinfo("Audile Voice Guide", 
-            "For the best experience, download Enhanced voices:\n\n"
-            "1. System Settings > Accessibility > Spoken Content\n"
-            "2. Click 'i' next to System Voice\n"
-            "3. Manage Voices > Download 'Enhanced' versions.\n\n"
+        messagebox.showinfo("Audile Experience", 
+            "For high-fidelity narration:\n\n"
+            "1. Accessibility > Spoken Content\n"
+            "2. Manage Voices > Download 'Enhanced' versions.\n\n"
             "Recommended: Samantha (Enhanced), Daniel (Enhanced).")
         os.system("open 'x-apple.systempreferences:com.apple.preference.universalaccess?SpokenContent'")
 
@@ -540,7 +578,7 @@ class AudileApp(ctk.CTk):
 
     def _add_bookmark(self):
         if not self.current_pdf_path: return
-        dialog = ctk.CTkInputDialog(text="Annotate this moment:", title="Audile Notes")
+        dialog = ctk.CTkInputDialog(text="Annotation:", title="Audile Notes")
         note = dialog.get_input()
         if note is None: return 
         
@@ -560,7 +598,7 @@ class AudileApp(ctk.CTk):
             widget.destroy()
             
         if not self.current_pdf_path or self.current_pdf_path not in self.bookmarks:
-            label = ctk.CTkLabel(self.bmk_scroll, text="No notes for this book.", font=ctk.CTkFont(family="SF Pro Text", slant="italic"))
+            label = ctk.CTkLabel(self.bmk_scroll, text="No notes.", font=ctk.CTkFont(slant="italic"))
             label.pack(pady=30)
             return
             

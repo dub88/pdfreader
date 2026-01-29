@@ -52,14 +52,23 @@ class PDFEngine:
         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
         return img
 
-    def get_page_data(self, page_num: int):
-        """Returns coherent paragraphs with bboxes, skipping headers/footers."""
+    def get_page_data(self, page_num: int, doc_type: str = "Book"):
+        """Returns coherent paragraphs with bboxes, adjusted by doc_type."""
         if not self.doc:
             return []
 
         page = self.doc[page_num - 1]
         page_height = page.rect.height
-        margin = page_height * 0.1
+        
+        # Adjust margin filtering based on document type
+        # Books usually have large headers/footers; Papers have smaller ones.
+        if doc_type == "Book":
+            margin = page_height * 0.12
+        elif doc_type == "Research":
+            margin = page_height * 0.05
+        else: # Standard Document
+            margin = 0
+            
         content_top, content_bottom = margin, page_height - margin
 
         blocks = page.get_text("dict")["blocks"]
@@ -82,21 +91,16 @@ class PDFEngine:
                 })
 
         # Merge blocks that are close together (likely same paragraph)
-        # to reduce choppiness and improve highlighting
         merged_blocks = []
         if not raw_blocks: return []
         
         current = raw_blocks[0]
         for i in range(1, len(raw_blocks)):
             next_b = raw_blocks[i]
-            
-            # If vertical distance is small, merge
-            # bbox is (x0, y0, x1, y1)
             dist = next_b["bbox"][1] - current["bbox"][3]
             
-            if 0 <= dist < 12: # Threshold for same paragraph
+            if 0 <= dist < 12: 
                 current["text"] += " " + next_b["text"]
-                # Expand bbox to cover both
                 current["bbox"][0] = min(current["bbox"][0], next_b["bbox"][0])
                 current["bbox"][2] = max(current["bbox"][2], next_b["bbox"][2])
                 current["bbox"][3] = next_b["bbox"][3]
@@ -105,11 +109,13 @@ class PDFEngine:
                 current = next_b
         merged_blocks.append(current)
             
-        # Final filter for headers/footers
+        # Final filter for headers/footers based on doc_type
         final_data = []
         for item in merged_blocks:
             y_mid = (item["bbox"][1] + item["bbox"][3]) / 2
             if content_top <= y_mid <= content_bottom:
+                final_data.append(item)
+            elif margin == 0: # If standard doc, keep everything
                 final_data.append(item)
                 
         return final_data
