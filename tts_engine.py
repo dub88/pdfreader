@@ -27,10 +27,10 @@ class TTSEngine:
     def __init__(self, on_word_callback=None):
         self._synth = AVSpeechSynthesizer.alloc().init()
         
-        # Word-level callback setup
-        if on_word_callback:
-            self._delegate = TTSDelegate.alloc().initWithCallback_(on_word_callback)
-            self._synth.setDelegate_(self._delegate)
+        # Word-level callback setup (Disabled due to GIL crash in compiled app)
+        # if on_word_callback:
+        #     self._delegate = TTSDelegate.alloc().initWithCallback_(on_word_callback)
+        #     self._synth.setDelegate_(self._delegate)
         
         self._voice = None
         self._rate = 0.5 
