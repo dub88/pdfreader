@@ -26,51 +26,39 @@ class TTSEngine:
         qualities = {1: "Standard", 2: "Enhanced", 3: "Premium"}
         
         # Novelty/Creepy voices (Legacy Mac voices)
-        novelty_ids = {
+        creepy_keywords = {
             "albert", "badnews", "bahh", "bells", "boing", "bubbles", "cellos", 
             "deranged", "goodnews", "hysterical", "junior", "organ", "princess", 
-            "ralph", "trinoids", "whisper", "zarvox", "eloquence"
+            "ralph", "trinoids", "whisper", "zarvox", "eloquence", "jester", "wobble"
         }
         
-        # LOGGING: Detailed log to Desktop
-        import subprocess
-        log_path = os.path.expanduser("~/Desktop/pdf_speaker_voice_debug.txt")
-        try:
-            # Get 'say' command output to compare
-            say_output = subprocess.check_output(["say", "-v", "?"], text=True)
-            with open(log_path, "w") as f:
-                f.write("PDF Speaker Voice Debug Log\n")
-                f.write(f"Sequoia Environment Check\n")
-                f.write("-" * 50 + "\n")
-                f.write("SYSTEM 'SAY' COMMAND VOICES:\n")
-                f.write(say_output)
-                f.write("\n" + "-" * 50 + "\n")
-                f.write(f"AVFOUNDATION VOICES ({len(voices)}):\n")
-                for v in voices:
-                    f.write(f"Name: {v.name()} | ID: {v.identifier()} | Lang: {v.language()} | Quality: {v.quality()}\n")
-        except: pass
+        # ... logging logic ...
 
         for v in voices:
             name = v.name()
-            v_id = v.identifier()
+            v_id = v.identifier().lower()
             lang = v.language()
             quality_num = v.quality()
             
             # Siri detection logic: name or ID
-            is_siri = any(x in v_id.lower() for x in ["siri", "ttsvoice", "aaron", "nicky", "martha", "arthur", "helena"]) or "siri" in name.lower()
-            is_personal = "personalvoice" in v_id.lower() or "personal" in name.lower()
+            is_siri = any(x in v_id for x in ["siri", "ttsvoice", "aaron", "nicky", "martha", "arthur", "helena"]) or "siri" in name.lower()
+            is_personal = "personalvoice" in v_id or "personal" in name.lower()
             
             # Hide novelty/creepy voices
-            is_novelty = any(x in v_id.lower() for x in novelty_ids) or any(x in name.lower() for x in ["bad news", "good news", "pipe organ"])
+            is_novelty = any(x in v_id for x in creepy_keywords) or any(x in name.lower() for x in ["bad news", "good news", "pipe organ", "jester", "wobble", "superstar"])
             
             # High-Quality detection
-            # On some systems, quality_num is stuck at 1. We check the ID for 'premium' or 'neural'
+            # 'compact' is the low-quality mobile version. Anything else is better.
             is_premium = (quality_num >= 2 or 
-                         any(x in v_id.lower() for x in ["premium", "neural", "enhanced", "siri", "ttsvoice"]) or
-                         is_siri or is_personal)
+                         any(x in v_id for x in ["premium", "enhanced", "siri", "ttsvoice"]) or
+                         is_personal)
+            
+            # Specifically check for 'compact' to downgrade
+            if "compact" in v_id and not (is_siri or is_personal):
+                is_premium = False
 
             results.append({
-                "id": v_id, 
+                "id": v.identifier(), 
                 "name": name, 
                 "lang": lang, 
                 "quality": qualities.get(quality_num, "Standard"),

@@ -132,6 +132,9 @@ class PDFReaderApp(ctk.CTk):
         self.manage_voices_btn = ctk.CTkButton(self.ctrl_tab, text="Reset Hidden Voices", height=25, font=ctk.CTkFont(size=10), fg_color="transparent", command=self._reset_hidden_voices)
         self.manage_voices_btn.pack(padx=10, pady=5)
 
+        self.download_help_btn = ctk.CTkButton(self.ctrl_tab, text="❓ Missing Siri Voice?", height=25, font=ctk.CTkFont(size=10), fg_color="transparent", command=self._show_voice_help)
+        self.download_help_btn.pack(padx=10, pady=5)
+
         self.premium_only_switch = ctk.CTkSwitch(self.ctrl_tab, text="High Quality Only", command=self._refresh_voice_list)
         self.premium_only_switch.select() # Default to ON
         self.premium_only_switch.pack(padx=10, pady=10)
@@ -436,6 +439,16 @@ class PDFReaderApp(ctk.CTk):
         self._refresh_voice_list()
         self._save_config()
 
+    def _show_voice_help(self):
+        messagebox.showinfo("Voice Help", 
+            "To use Siri or High-Quality voices in third-party apps:\n\n"
+            "1. Open System Settings\n"
+            "2. Go to Accessibility > Spoken Content\n"
+            "3. Click the 'i' next to 'System Voice'\n"
+            "4. Search for your preferred voice (e.g. 'Siri')\n"
+            "5. Click the Download icon (cloud) to install the high-quality version.\n\n"
+            "Once downloaded, restart PDF Speaker to see the new voices!")
+
     def _refresh_voice_list(self):
         raw_voices = self.tts_engine.get_voices()
         premium_only = self.premium_only_switch.get() == 1
@@ -444,7 +457,7 @@ class PDFReaderApp(ctk.CTk):
         for v in raw_voices:
             if v['id'] in self.hidden_voice_ids: continue
             
-            # DEFAULT FILTER: Always hide novelty/creepy voices
+            # DEFAULT FILTER: Strictly hide novelty/creepy voices
             if v['is_novelty']: continue
             
             # PREMIUM FILTER: If enabled, hide non-premium
@@ -454,26 +467,22 @@ class PDFReaderApp(ctk.CTk):
             # Key for deduplication: name + language
             key = (v['name'], v['lang'])
             
-            # PRIORITY: Keep Siri, then highest quality
+            # PRIORITY: Keep Siri/Personal, then highest quality
             if key not in voice_map:
                 voice_map[key] = v
             else:
-                # If existing isn't Siri but new one is, swap
-                if not voice_map[key]['is_siri'] and v['is_siri']:
+                existing = voice_map[key]
+                # Priority weight: Personal (10) > Siri (5) > Quality (1-3)
+                def get_score(voice):
+                    s = voice['quality_val']
+                    if voice['is_siri']: s += 10
+                    if voice.get('is_personal'): s += 50
+                    return s
+                
+                if get_score(v) > get_score(existing):
                     voice_map[key] = v
-                # If both are same Siri-status, keep higher quality
-                elif voice_map[key]['is_siri'] == v['is_siri']:
-                    if v['quality_val'] > voice_map[key]['quality_val']:
-                        voice_map[key] = v
         
         self.voices = list(voice_map.values())
-        
-        # Fallback: if we filtered too aggressively and list is empty, turn off high quality filter
-        if not self.voices and premium_only:
-            self.premium_only_switch.deselect()
-            # Important: recursion fallback to show SOMETHING
-            self.after(10, self._refresh_voice_list)
-            return
         
         # Sort: Personal Voice -> Siri -> Language -> Name
         self.voices.sort(key=lambda v: (
@@ -487,11 +496,10 @@ class PDFReaderApp(ctk.CTk):
         self.voice_display_names = []
         for v in self.voices:
             tag = ""
-            if v['quality_val'] == 3: tag = "💎" # Premium
+            if v['is_siri']: tag = "✨"
+            elif v.get('is_personal'): tag = "👤"
+            elif v['quality_val'] == 3: tag = "💎" # Premium
             elif v['quality_val'] == 2: tag = "★" # Enhanced
-            
-            if v.get('is_personal'): tag = "👤"
-            elif v.get('is_siri'): tag = "✨" # Special tag for Siri
             
             self.voice_display_names.append(f"{v['name']} ({v['lang']}) {tag}")
 
