@@ -65,7 +65,7 @@ class AudileApp(ctk.CTk):
         self.logo_label.pack(padx=20, pady=(40, 20))
 
         self.tabview = ctk.CTkTabview(self.sidebar, width=250, 
-                                      segmented_button_fg_color="transparent",
+                                      segmented_button_fg_color=None,
                                       segmented_button_selected_color=("#FA2D48", "#FA2D48"),
                                       segmented_button_selected_hover_color=("#D41C33", "#D41C33"),
                                       segmented_button_unselected_color=("#8E8E93", "#8E8E93"))
