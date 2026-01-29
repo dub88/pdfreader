@@ -53,72 +53,106 @@ class PDFEngine:
         return img
 
     def get_page_data(self, page_num: int, doc_type: str = "Book"):
-        """Returns coherent paragraphs with bboxes, adjusted by doc_type."""
+        """Returns paragraphs with both full text and word-level coordinate maps."""
         if not self.doc:
             return []
 
         page = self.doc[page_num - 1]
         page_height = page.rect.height
         
-        # Adjust margin filtering based on document type
-        # Books usually have large headers/footers; Papers have smaller ones.
         if doc_type == "Book":
             margin = page_height * 0.12
         elif doc_type == "Research":
             margin = page_height * 0.05
-        else: # Standard Document
+        else:
             margin = 0
             
         content_top, content_bottom = margin, page_height - margin
 
+        # Get detailed text with word coordinates
+        # "words" returns list of (x0, y0, x1, y1, "word", block_no, line_no, word_no)
+        words = page.get_text("words")
+        
+        # We still want to group by paragraphs (blocks) for natural reading
         blocks = page.get_text("dict")["blocks"]
-        raw_blocks = []
+        final_blocks = []
         
         for b in blocks:
             if "lines" not in b: continue
             
             block_text = ""
+            block_words = [] # To store (bbox, start_char, end_char)
+            
+            char_count = 0
             for line in b["lines"]:
                 for span in line["spans"]:
-                    block_text += span["text"]
-                block_text += " "
+                    # Find words that fall within this span's bbox roughly
+                    span_text = span["text"]
+                    # Add span text to block
+                    block_text += span_text + " "
+                    
+                    # Store word data for this span
+                    # This is complex because get_text("words") and get_text("dict") 
+                    # might not align perfectly. Better approach:
+                    # Parse the span into words manually and use span bbox for alignment.
             
             cleaned = self._clean_text(block_text)
             if cleaned:
-                raw_blocks.append({
+                # Store the block with a map of character ranges to bounding boxes
+                # For simplicity, we'll store the word bounding boxes for this block
+                block_words = self._extract_word_boxes(page, b["bbox"])
+                
+                final_blocks.append({
                     "text": cleaned,
-                    "bbox": list(b["bbox"])
+                    "bbox": list(b["bbox"]),
+                    "words": block_words # List of {"text": "...", "bbox": [...]}
                 })
 
-        # Merge blocks that are close together (likely same paragraph)
-        merged_blocks = []
-        if not raw_blocks: return []
+        # Merge blocks logic...
+        merged = []
+        if not final_blocks: return []
         
-        current = raw_blocks[0]
-        for i in range(1, len(raw_blocks)):
-            next_b = raw_blocks[i]
-            dist = next_b["bbox"][1] - current["bbox"][3]
+        curr = final_blocks[0]
+        for i in range(1, len(final_blocks)):
+            nxt = final_blocks[i]
+            dist = nxt["bbox"][1] - curr["bbox"][3]
             
-            if 0 <= dist < 12: 
-                current["text"] += " " + next_b["text"]
-                current["bbox"][0] = min(current["bbox"][0], next_b["bbox"][0])
-                current["bbox"][2] = max(current["bbox"][2], next_b["bbox"][2])
-                current["bbox"][3] = next_b["bbox"][3]
+            if 0 <= dist < 12:
+                curr["text"] += " " + nxt["text"]
+                curr["words"].extend(nxt["words"])
+                curr["bbox"][0] = min(curr["bbox"][0], nxt["bbox"][0])
+                curr["bbox"][2] = max(curr["bbox"][2], nxt["bbox"][2])
+                curr["bbox"][3] = nxt["bbox"][3]
             else:
-                merged_blocks.append(current)
-                current = next_b
-        merged_blocks.append(current)
+                merged.append(curr)
+                curr = nxt
+        merged.append(curr)
             
-        # Final filter for headers/footers based on doc_type
-        final_data = []
-        for item in merged_blocks:
+        # Filter headers/footers
+        result = []
+        for item in merged:
             y_mid = (item["bbox"][1] + item["bbox"][3]) / 2
-            if content_top <= y_mid <= content_bottom:
-                final_data.append(item)
-            elif margin == 0: # If standard doc, keep everything
-                final_data.append(item)
+            if margin == 0 or (content_top <= y_mid <= content_bottom):
+                result.append(item)
                 
-        return final_data
+        return result
+
+    def _extract_word_boxes(self, page, block_bbox):
+        """Extracts individual word bounding boxes within a specific area."""
+        all_words = page.get_text("words")
+        found = []
+        bx0, by0, bx1, by1 = block_bbox
+        
+        for w in all_words:
+            # Check if word center is inside block bbox
+            wx_mid = (w[0] + w[2]) / 2
+            wy_mid = (w[1] + w[3]) / 2
+            if bx0 <= wx_mid <= bx1 and by0 <= wy_mid <= by1:
+                found.append({
+                    "text": w[4],
+                    "bbox": [w[0], w[1], w[2], w[3]]
+                })
+        return found
 
     def _clean_text(self, text: str) -> str:
         """Cleans up PDF artifacts and corrects font-mapping errors."""

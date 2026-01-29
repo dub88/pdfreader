@@ -2,18 +2,35 @@ from AVFoundation import (
     AVSpeechSynthesizer, 
     AVSpeechUtterance, 
     AVSpeechSynthesisVoice,
-    AVSpeechBoundaryImmediate
+    AVSpeechBoundaryImmediate,
+    AVSpeechSynthesizerDelegate
 )
+from Foundation import NSObject
 import time
 import os
-from typing import List, Dict
+import re
+from typing import List, Dict, Callable
+
+class TTSDelegate(NSObject):
+    def initWithCallback_(self, callback: Callable):
+        self = super().init()
+        if self:
+            self._callback = callback
+        return self
+
+    def speechSynthesizer_willSpeakRangeOfSpeechString_utterance_(self, synth, char_range, utterance):
+        # char_range is an NSRange (location, length)
+        if self._callback:
+            self._callback(char_range.location, char_range.length)
 
 class TTSEngine:
-    def __init__(self):
-        # AVFoundation is the modern Apple API for speech
+    def __init__(self, on_word_callback=None):
         self._synth = AVSpeechSynthesizer.alloc().init()
+        self._delegate = TTSDelegate.alloc().initWithCallback_(on_word_callback)
+        self._synth.setDelegate_(self._delegate)
+        
         self._voice = None
-        self._rate = 0.5 # Default AVFoundation rate (0.0 to 1.0)
+        self._rate = 0.5 
         self._volume = 1.0
         self.is_paused = False
 
@@ -21,48 +38,22 @@ class TTSEngine:
         """Returns a list of available macOS voices with metadata."""
         voices = AVSpeechSynthesisVoice.speechVoices()
         results = []
-        
-        # Mapping for quality enums
         qualities = {1: "Standard", 2: "Enhanced", 3: "Premium"}
-        
-        # Novelty/Creepy voices (Legacy Mac voices)
         creepy_keywords = {
             "albert", "badnews", "bahh", "bells", "boing", "bubbles", "cellos", 
             "deranged", "goodnews", "hysterical", "junior", "organ", "princess", 
             "ralph", "trinoids", "whisper", "zarvox", "eloquence", "jester", "wobble", "superstar"
         }
         
-        # LOGGING: Help find Siri on Sequoia
-        log_path = os.path.expanduser("~/Desktop/pdf_speaker_voice_debug.txt")
-        try:
-            with open(log_path, "w") as f:
-                f.write("PDF Speaker Voice Debug Log\n")
-                f.write(f"Total Voices Detected: {len(voices)}\n")
-                f.write("-" * 50 + "\n")
-                for v in voices:
-                    f_id = v.identifier().lower()
-                    is_siri_id = any(x in f_id for x in ["siri", "ttsvoice", "aaron", "nicky", "martha", "arthur", "helena"])
-                    f.write(f"Name: {v.name()} | ID: {v.identifier()} | Quality: {v.quality()} | SiriID: {is_siri_id}\n")
-        except: pass
-
         for v in voices:
             name = v.name()
             v_id = v.identifier().lower()
             lang = v.language()
             quality_num = v.quality()
-            
-            # Personal voice detection (Still works!)
             is_personal = "personalvoice" in v_id or "personal" in name.lower()
-            
-            # Hide novelty/creepy voices
             is_novelty = any(x in v_id for x in creepy_keywords) or any(x in name.lower() for x in ["bad news", "good news", "pipe organ", "jester", "wobble", "superstar"])
-            
-            # High-Quality detection
             is_compact = "compact" in v_id
-            # On Sequoia, we treat everything non-compact/non-creepy as high quality because quality_num is buggy
-            is_premium = (quality_num >= 2 or 
-                         is_personal or 
-                         ("compact" not in v_id and not is_novelty))
+            is_premium = (quality_num >= 2 or is_personal or ("compact" not in v_id and not is_novelty))
 
             results.append({
                 "id": v.identifier(), 
@@ -70,7 +61,7 @@ class TTSEngine:
                 "lang": lang, 
                 "quality": qualities.get(quality_num, "Standard"),
                 "quality_val": quality_num,
-                "is_siri": False, # Siri is restricted in 3rd party apps
+                "is_siri": False, 
                 "is_personal": is_personal,
                 "is_novelty": is_novelty,
                 "is_premium": is_premium
@@ -78,51 +69,48 @@ class TTSEngine:
         return results
 
     def preview(self, voice_id: str):
-        """Speaks a short preview sentence using the selected voice."""
         self.stop()
-        preview_text = "Hello, I am a high-quality voice on your Mac. I can read your documents with natural prosody."
-        
-        # Check if the voice is non-English to provide a better preview
-        voice = AVSpeechSynthesisVoice.voiceWithIdentifier_(voice_id)
-        if voice and not voice.language().startswith("en"):
-            preview_text = "Hello, I am a native voice. I can read documents in my language, or read English with my natural accent."
-
-        self.speak(preview_text)
+        self.speak("Hello, I am a high-quality voice on your Mac.")
 
     def set_voice(self, voice_id: str):
-        """Sets the voice to be used for speech."""
         self._voice = AVSpeechSynthesisVoice.voiceWithIdentifier_(voice_id)
 
     def set_rate(self, rate: float):
-        """
-        AVFoundation rate scale is different. 
-        0.5 is normal speed. 0.0 is very slow, 1.0 is very fast.
-        Input rate 1.0x -> 0.5
-        Input rate 2.0x -> 0.65
-        """
-        # Map 0.5x-3.0x to AVFoundation's 0.0-1.0
-        # Simple linear approximation:
         new_rate = 0.2 + (rate * 0.3)
         self._rate = max(0.0, min(1.0, new_rate))
 
-    def set_volume(self, volume: float):
-        self._volume = volume
-
     def speak(self, text: str):
-        """Starts speaking text using modern AVFoundation."""
         self.is_paused = False
-        utterance = AVSpeechUtterance.speechUtteranceWithString_(text)
         
+        # PRE-PROCESS: Fix Year Pronunciation (e.g. 1975 -> nineteen seventy five)
+        processed_text = self._fix_years(text)
+        
+        utterance = AVSpeechUtterance.speechUtteranceWithString_(processed_text)
         if self._voice:
             utterance.setVoice_(self._voice)
-        
         utterance.setRate_(self._rate)
         utterance.setVolume_(self._volume)
-        
         self._synth.speakUtterance_(utterance)
 
+    def _fix_years(self, text: str) -> str:
+        """Regex to find 4-digit years and make them phonetic."""
+        def year_repl(match):
+            year = match.group(0)
+            # Only process likely years (1800-2099)
+            y_int = int(year)
+            if 1800 <= y_int <= 2099:
+                # Handle 2000-2009 differently
+                if 2000 <= y_int <= 2009:
+                    return f"two thousand {y_int % 100 if y_int % 100 > 0 else ''}"
+                else:
+                    first_half = year[:2]
+                    second_half = year[2:]
+                    return f"{first_half} {second_half}"
+            return year
+            
+        return re.sub(r'\b\d{4}\b', year_repl, text)
+
     def is_speaking(self) -> bool:
-        """Checks if the synthesizer is speaking or has content in queue."""
         return self._synth.isSpeaking()
 
     def pause(self):
