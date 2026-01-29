@@ -4,15 +4,15 @@
 
 *   **Product Name**: PDF Speaker for macOS
 *   **Price**: $19 (One-time payment)
-*   **Tagline**: Stop paying subscriptions for text-to-speech. Use your Mac's premium Siri voices.
+*   **Tagline**: Stop paying subscriptions for text-to-speech. Use your Mac's premium built-in voices.
 *   **Description**:
     PDF Speaker is a native macOS application designed for people who want to listen to their PDF documents, books, and articles without the $20/month subscription fee of tools like Speechify. 
 
-    Powered by your Mac's built-in neural Siri voices, PDF Speaker provides a high-quality "listen-while-reading" experience with synchronized highlighting and smart text processing.
+    Powered by your Mac's built-in Enhanced neural voices (like Samantha Enhanced), PDF Speaker provides a high-quality "listen-while-reading" experience with synchronized highlighting and smart text processing.
 
     **Key Features**:
     - **Personal PDF Library**: Add multiple books and documents to your local library. Switch between them instantly with independent progress tracking—the app always remembers your exact page for every book.
-    - **Premium Neural Voices**: Access Siri's best voices for free, offline, with no character limits.
+    - **Premium Neural Voices**: Access Apple's highest-quality Enhanced voices for free, offline, with no character limits.
     - **Voice Customization**: Hide voices you don't like and preview voices with a single click to find your perfect narrator.
     - **Bookmarks & Annotations**: Save noteworthy pages with custom notes to revisit your research or favorite chapters later.
     - **Synchronized Highlighting**: A visual focus frame follows the text as it’s read, perfect for deep work or learning.
@@ -56,7 +56,7 @@ main.py
     | :--- | :--- | :--- |
     | **Price** | **$19 (Lifetime)** | $139+/year |
     | **Privacy** | Local-only | Cloud-processed |
-    | **Voices** | Siri Premium | Proprietary AI |
+    | **Voices** | Apple Enhanced | Proprietary AI |
     | **Limits** | Unlimited | Monthly character caps |
 
 ---

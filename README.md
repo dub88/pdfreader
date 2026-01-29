@@ -1,12 +1,12 @@
 # PDF Speaker for macOS
 
-PDF Speaker is a high-quality, native macOS application that reads your PDF documents aloud using Apple's premium Siri voices. Designed for a "listen-while-reading" experience, it features synchronized highlighting and smart text processing that rivals paid subscription services.
+PDF Speaker is a high-quality, native macOS application that reads your PDF documents aloud using Apple's premium Enhanced voices. Designed for a "listen-while-reading" experience, it features synchronized highlighting and smart text processing that rivals paid subscription services.
 
 ![App Screenshot](https://via.placeholder.com/800x600?text=PDF+Speaker+Screenshot)
 
 ## Features
 
-*   **Premium Neural Voices**: Utilizes the high-quality, native macOS speech engine (including Siri voices) without requiring internet access or paid APIs.
+*   **Premium Neural Voices**: Utilizes Apple's high-quality Enhanced voices (e.g., Samantha Enhanced) via the native macOS speech engine without requiring internet access or paid APIs. *Note: Actual Siri voices are restricted by Apple to first-party apps only.*
 *   **Synchronized Highlighting**: Follow along with a yellow focus frame that moves paragraph-by-paragraph in perfect sync with the audio.
 *   **Smart Text Extraction**:
     *   **Header/Footer Skipping**: Automatically ignores running headers, page numbers, and footers so your audiobook flows naturally.
@@ -24,7 +24,7 @@ PDF Speaker is a high-quality, native macOS application that reads your PDF docu
 *   **Python 3.13**
 *   **CustomTkinter**: For a modern, dark-mode compatible UI.
 *   **PyMuPDF (Fitz)**: For ultra-fast PDF rendering and text coordinate extraction.
-*   **PyObjC**: For direct integration with the native macOS `NSSpeechSynthesizer` API (bypassing the limitations of cross-platform libraries).
+*   **PyObjC**: For direct integration with the native macOS `AVSpeechSynthesizer` API (bypassing the limitations of cross-platform libraries).
 
 ## Installation
 
