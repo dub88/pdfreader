@@ -31,15 +31,16 @@ class TTSEngine:
             quality_num = v.quality()
             quality = qualities.get(quality_num, "Standard")
             
-            # Clean up language (e.g., "en-US" -> "English")
-            # For now, keep the code short and just use the locale
+            # Siri detection logic: name or ID
+            is_siri = "siri" in name.lower() or "siri" in v_id.lower()
             
             results.append({
                 "id": v_id, 
                 "name": name, 
                 "lang": lang, 
                 "quality": quality,
-                "quality_val": quality_num
+                "quality_val": quality_num,
+                "is_siri": is_siri
             })
         return results
 

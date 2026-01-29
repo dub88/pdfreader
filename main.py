@@ -34,6 +34,10 @@ class PDFReaderApp(ctk.CTk):
         self.zoom_factor = 1.0
         self.current_tk_img = None
         
+        # New State
+        self.hidden_voice_ids = set()
+        self.bookmarks = {} # { "pdf_path": [ {"page": 5, "note": "..."} ] }
+        
         # UI Setup
         self._setup_ui()
         self._load_config()
@@ -51,82 +55,110 @@ class PDFReaderApp(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        self.sidebar = ctk.CTkFrame(self, width=220, corner_radius=0)
+        # Sidebar with Tabs
+        self.sidebar = ctk.CTkFrame(self, width=240, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
-
+        
         self.logo_label = ctk.CTkLabel(self.sidebar, text="PDF SPEAKER", font=ctk.CTkFont(family="System", size=22, weight="bold"))
-        self.logo_label.grid(row=0, column=0, padx=20, pady=(30, 20))
+        self.logo_label.pack(padx=20, pady=(30, 10))
 
-        self.open_button = ctk.CTkButton(self.sidebar, text="📂 Open PDF", height=35, command=self._open_file)
-        self.open_button.grid(row=1, column=0, padx=20, pady=10)
+        self.tabview = ctk.CTkTabview(self.sidebar, width=220)
+        self.tabview.pack(padx=10, pady=10, expand=True, fill="both")
+        self.tabview.add("Controls")
+        self.tabview.add("Bookmarks")
+        
+        # --- TAB: CONTROLS ---
+        self.ctrl_tab = self.tabview.tab("Controls")
+        
+        self.open_button = ctk.CTkButton(self.ctrl_tab, text="📂 Open PDF", height=35, command=self._open_file)
+        self.open_button.pack(padx=10, pady=10, fill="x")
 
-        self.controls_label = ctk.CTkLabel(self.sidebar, text="PLAYBACK CONTROL", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray")
-        self.controls_label.grid(row=2, column=0, padx=20, pady=(20, 5))
-
-        self.play_btn_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        self.play_btn_frame.grid(row=3, column=0, padx=20, pady=5)
+        self.play_btn_frame = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
+        self.play_btn_frame.pack(padx=10, pady=5, fill="x")
         
         self.play_button = ctk.CTkButton(self.play_btn_frame, text="▶ Play", width=85, height=35, fg_color="#2ecc71", hover_color="#27ae60", command=self._play)
-        self.play_button.grid(row=0, column=0, padx=(0, 5))
+        self.play_button.pack(side="left", padx=(0, 5), expand=True, fill="x")
 
         self.pause_button = ctk.CTkButton(self.play_btn_frame, text="⏸ Pause", width=85, height=35, command=self._pause)
-        self.pause_button.grid(row=0, column=1, padx=(5, 0))
+        self.pause_button.pack(side="left", padx=(5, 0), expand=True, fill="x")
 
-        self.stop_button = ctk.CTkButton(self.sidebar, text="⏹ Stop", height=35, fg_color="#e74c3c", hover_color="#c0392b", command=self._stop)
-        self.stop_button.grid(row=4, column=0, padx=20, pady=10)
+        self.stop_button = ctk.CTkButton(self.ctrl_tab, text="⏹ Stop", height=35, fg_color="#e74c3c", hover_color="#c0392b", command=self._stop)
+        self.stop_button.pack(padx=10, pady=5, fill="x")
 
-        self.nav_label = ctk.CTkLabel(self.sidebar, text="NAVIGATION", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray")
-        self.nav_label.grid(row=5, column=0, padx=20, pady=(20, 5))
-
-        self.nav_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        self.nav_frame.grid(row=6, column=0, padx=20, pady=5)
+        self.nav_frame = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
+        self.nav_frame.pack(padx=10, pady=10, fill="x")
         
-        self.prev_page_btn = ctk.CTkButton(self.nav_frame, text="← Prev", width=85, command=self._prev_page)
-        self.prev_page_btn.grid(row=0, column=0, padx=(0, 5))
+        self.prev_page_btn = ctk.CTkButton(self.nav_frame, text="←", width=40, command=self._prev_page)
+        self.prev_page_btn.pack(side="left", padx=(0, 5))
         
-        self.next_page_btn = ctk.CTkButton(self.nav_frame, text="Next →", width=85, command=self._next_page)
-        self.next_page_btn.grid(row=0, column=1, padx=(5, 0))
+        self.page_info_label = ctk.CTkLabel(self.nav_frame, text="Page 0 / 0", font=ctk.CTkFont(size=12, weight="bold"))
+        self.page_info_label.pack(side="left", expand=True)
 
-        self.settings_label = ctk.CTkLabel(self.sidebar, text="SETTINGS", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray")
-        self.settings_label.grid(row=7, column=0, padx=20, pady=(20, 5))
+        self.next_page_btn = ctk.CTkButton(self.nav_frame, text="→", width=40, command=self._next_page)
+        self.next_page_btn.pack(side="left", padx=(5, 0))
 
-        self.speed_label = ctk.CTkLabel(self.sidebar, text="Reading Speed: 1.0x", font=ctk.CTkFont(size=12))
-        self.speed_label.grid(row=8, column=0, padx=20, pady=(5, 0))
-        self.speed_slider = ctk.CTkSlider(self.sidebar, from_=0.5, to=3.0, number_of_steps=25, command=self._on_speed_change)
+        self.speed_label = ctk.CTkLabel(self.ctrl_tab, text="Reading Speed: 1.0x", font=ctk.CTkFont(size=12))
+        self.speed_label.pack(padx=10, pady=(15, 0))
+        self.speed_slider = ctk.CTkSlider(self.ctrl_tab, from_=0.5, to=3.0, number_of_steps=25, command=self._on_speed_change)
         self.speed_slider.set(1.0)
-        self.speed_slider.grid(row=9, column=0, padx=20, pady=5)
+        self.speed_slider.pack(padx=10, pady=5, fill="x")
 
-        self.voice_label = ctk.CTkLabel(self.sidebar, text="VOICE", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray")
-        self.voice_label.grid(row=10, column=0, padx=20, pady=(20, 5))
+        self.voice_label = ctk.CTkLabel(self.ctrl_tab, text="Voice Selection", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray")
+        self.voice_label.pack(padx=10, pady=(15, 0))
         
-        # Get and filter voices
-        raw_voices = self.tts_engine.get_voices()
-        voice_map = {}
-        for v in raw_voices:
-            # Keep only the highest quality for each name+lang combo
-            key = (v['name'], v['lang'])
-            if key not in voice_map or v['quality_val'] > voice_map[key]['quality_val']:
-                voice_map[key] = v
-        
-        self.voices = list(voice_map.values())
-        self.voices.sort(key=lambda v: (
-            "siri" not in v['name'].lower() and "siri" not in v['id'].lower(),
-            not v['lang'].startswith("en"),
-            v['name']
-        ))
-        
-        self.voice_display_names = [f"{v['name']} ({v['lang']}) {'★' if v['quality_val'] > 1 else ''}" for v in self.voices]
-        self.voice_menu = ctk.CTkOptionMenu(self.sidebar, values=self.voice_display_names, command=self._on_voice_change)
-        self.voice_menu.grid(row=11, column=0, padx=20, pady=5)
+        self.voice_menu = ctk.CTkOptionMenu(self.ctrl_tab, values=[], command=self._on_voice_change)
+        self.voice_menu.pack(padx=10, pady=5, fill="x")
 
-        self.preview_btn = ctk.CTkButton(self.sidebar, text="🔊 Preview Voice", height=30, fg_color="transparent", border_width=1, command=self._preview_voice)
-        self.preview_btn.grid(row=12, column=0, padx=20, pady=10)
+        self.voice_action_frame = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
+        self.voice_action_frame.pack(padx=10, pady=5, fill="x")
 
-        siri_voice = next((v for v in self.voices if "siri" in v['name'].lower()), None)
-        if siri_voice:
-            idx = self.voices.index(siri_voice)
-            self.voice_menu.set(self.voice_display_names[idx])
-            self.tts_engine.set_voice(siri_voice['id'])
+        self.preview_btn = ctk.CTkButton(self.voice_action_frame, text="🔊 Test", width=80, height=30, fg_color="transparent", border_width=1, command=self._preview_voice)
+        self.preview_btn.pack(side="left", padx=(0, 2), expand=True, fill="x")
+
+        self.hide_voice_btn = ctk.CTkButton(self.voice_action_frame, text="👁 Hide", width=80, height=30, fg_color="transparent", border_width=1, command=self._hide_current_voice)
+        self.hide_voice_btn.pack(side="left", padx=(2, 0), expand=True, fill="x")
+        
+        self.manage_voices_btn = ctk.CTkButton(self.ctrl_tab, text="Reset Hidden Voices", height=25, font=ctk.CTkFont(size=10), fg_color="transparent", command=self._reset_hidden_voices)
+        self.manage_voices_btn.pack(padx=10, pady=5)
+
+        # --- TAB: BOOKMARKS ---
+        self.bmk_tab = self.tabview.tab("Bookmarks")
+        
+        self.add_bmk_btn = ctk.CTkButton(self.bmk_tab, text="🔖 Bookmark Current Page", command=self._add_bookmark)
+        self.add_bmk_btn.pack(padx=10, pady=10, fill="x")
+        
+        self.bmk_scroll = ctk.CTkScrollableFrame(self.bmk_tab, label_text="Saved Positions")
+        self.bmk_scroll.pack(padx=5, pady=5, expand=True, fill="both")
+
+        # --- MAIN CONTENT ---
+        self.content_frame = ctk.CTkFrame(self, corner_radius=10)
+        self.content_frame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
+        self.content_frame.grid_columnconfigure(0, weight=1)
+        self.content_frame.grid_rowconfigure(0, weight=1)
+
+        self.canvas_frame = ctk.CTkFrame(self.content_frame)
+        self.canvas_frame.grid(row=0, column=0, sticky="nsew")
+        self.canvas_frame.grid_columnconfigure(0, weight=1)
+        self.canvas_frame.grid_rowconfigure(0, weight=1)
+
+        self.canvas = tk.Canvas(self.canvas_frame, bg="#2b2b2b", highlightthickness=0)
+        self.canvas.grid(row=0, column=0, sticky="nsew")
+        
+        self.v_scrollbar = ctk.CTkScrollbar(self.canvas_frame, orientation="vertical", command=self.canvas.yview)
+        self.v_scrollbar.grid(row=0, column=1, sticky="ns")
+        self.h_scrollbar = ctk.CTkScrollbar(self.canvas_frame, orientation="horizontal", command=self.canvas.xview)
+        self.h_scrollbar.grid(row=1, column=0, sticky="ew")
+        self.canvas.configure(yscrollcommand=self.v_scrollbar.set, xscrollcommand=self.h_scrollbar.set)
+
+        self.progress_bar = ctk.CTkProgressBar(self.content_frame)
+        self.progress_bar.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="ew")
+        self.progress_bar.set(0)
+
+        self.status_label = ctk.CTkLabel(self, text="Ready", anchor="w")
+        self.status_label.grid(row=1, column=0, columnspan=2, padx=20, pady=5, sticky="ew")
+        
+        # Build initial voice list
+        self._refresh_voice_list()
 
         self.content_frame = ctk.CTkFrame(self, corner_radius=10)
         self.content_frame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
@@ -183,12 +215,15 @@ class PDFReaderApp(ctk.CTk):
     def _on_pdf_loaded(self):
         self.status_label.configure(text=f"Loaded: {os.path.basename(self.current_pdf_path)}")
         self._load_page_data(self.current_page_num)
+        self._refresh_bookmark_list()
         self._save_config()
 
     def _load_page_data(self, page_num):
         self.current_page_num = page_num
         self.current_page_blocks = self.pdf_engine.get_page_data(page_num)
         self.current_block_index = 0
+        if self.page_info_label:
+            self.page_info_label.configure(text=f"Page {page_num} / {self.pdf_engine.total_pages}")
         self._render_page()
 
     def _render_page(self, force=False):
@@ -332,15 +367,116 @@ class PDFReaderApp(ctk.CTk):
 
     def _preview_voice(self):
         current_voice_display = self.voice_menu.get()
+        if not current_voice_display: return
         idx = self.voice_display_names.index(current_voice_display)
         voice = self.voices[idx]
         self.tts_engine.preview(voice['id'])
+
+    def _hide_current_voice(self):
+        current_voice_display = self.voice_menu.get()
+        if not current_voice_display: return
+        idx = self.voice_display_names.index(current_voice_display)
+        voice = self.voices[idx]
+        self.hidden_voice_ids.add(voice['id'])
+        self._refresh_voice_list()
+        self._save_config()
+
+    def _reset_hidden_voices(self):
+        self.hidden_voice_ids.clear()
+        self._refresh_voice_list()
+        self._save_config()
+
+    def _refresh_voice_list(self):
+        raw_voices = self.tts_engine.get_voices()
+        voice_map = {}
+        for v in raw_voices:
+            if v['id'] in self.hidden_voice_ids: continue
+            
+            key = (v['name'], v['lang'])
+            if key not in voice_map or v['quality_val'] > voice_map[key]['quality_val']:
+                voice_map[key] = v
+        
+        self.voices = list(voice_map.values())
+        self.voices.sort(key=lambda v: (
+            not v['is_siri'],
+            not v['lang'].startswith("en"),
+            v['name']
+        ))
+        
+        self.voice_display_names = [f"{v['name']} ({v['lang']}) {'★' if v['quality_val'] > 1 else ''}" for v in self.voices]
+        if self.voice_menu:
+            self.voice_menu.configure(values=self.voice_display_names)
+            if self.voice_display_names:
+                # Try to keep current or set to first Siri
+                current = self.voice_menu.get()
+                if current not in self.voice_display_names:
+                    self.voice_menu.set(self.voice_display_names[0])
+                    self._on_voice_change(self.voice_display_names[0])
+
+    def _add_bookmark(self):
+        if not self.current_pdf_path: return
+        
+        # Simple input dialog for note
+        dialog = ctk.CTkInputDialog(text="Enter a note for this bookmark:", title="Add Bookmark")
+        note = dialog.get_input()
+        if note is None: return # Cancelled
+        
+        if self.current_pdf_path not in self.bookmarks:
+            self.bookmarks[self.current_pdf_path] = []
+            
+        self.bookmarks[self.current_pdf_path].append({
+            "page": self.current_page_num,
+            "note": note or f"Page {self.current_page_num}",
+            "timestamp": time.time()
+        })
+        self._refresh_bookmark_list()
+        self._save_config()
+
+    def _refresh_bookmark_list(self):
+        for widget in self.bmk_scroll.winfo_children():
+            widget.destroy()
+            
+        if not self.current_pdf_path or self.current_pdf_path not in self.bookmarks:
+            label = ctk.CTkLabel(self.bmk_scroll, text="No bookmarks yet", font=ctk.CTkFont(slant="italic"))
+            label.pack(pady=20)
+            return
+            
+        # Sort bookmarks by page number
+        bmks = sorted(self.bookmarks[self.current_pdf_path], key=lambda x: x['page'])
+        
+        for b in bmks:
+            frame = ctk.CTkFrame(self.bmk_scroll, fg_color="transparent")
+            frame.pack(fill="x", pady=2)
+            
+            btn = ctk.CTkButton(frame, text=f"P{b['page']}: {b['note'][:20]}...", 
+                               anchor="w", height=30,
+                               command=lambda p=b['page']: self._jump_to_page(p))
+            btn.pack(side="left", fill="x", expand=True, padx=(0, 2))
+            
+            del_btn = ctk.CTkButton(frame, text="×", width=25, height=30, fg_color="transparent", 
+                                   hover_color="#e74c3c", command=lambda p=b['page'], t=b['timestamp']: self._delete_bookmark(p, t))
+            del_btn.pack(side="right")
+
+    def _jump_to_page(self, page_num):
+        self._stop()
+        self._load_page_data(page_num)
+
+    def _delete_bookmark(self, page_num, timestamp):
+        if self.current_pdf_path in self.bookmarks:
+            self.bookmarks[self.current_pdf_path] = [b for b in self.bookmarks[self.current_pdf_path] 
+                                                   if not (b['page'] == page_num and b['timestamp'] == timestamp)]
+            self._refresh_bookmark_list()
+            self._save_config()
 
     def _load_config(self):
         if os.path.exists(self.config_file):
             try:
                 with open(self.config_file, 'r') as f:
                     config = json.load(f)
+                    self.hidden_voice_ids = set(config.get("hidden_voices", []))
+                    self.bookmarks = config.get("bookmarks", {})
+                    self._refresh_voice_list()
+                    
                     if config.get("last_pdf") and os.path.exists(config["last_pdf"]):
                         self.current_page_num = config.get("last_page", 1)
                         self._load_pdf(config["last_pdf"])
@@ -349,7 +485,13 @@ class PDFReaderApp(ctk.CTk):
     def _save_config(self):
         try:
             with open(self.config_file, 'w') as f:
-                json.dump({"last_pdf": self.current_pdf_path, "last_page": self.current_page_num}, f)
+                config = {
+                    "last_pdf": self.current_pdf_path, 
+                    "last_page": self.current_page_num,
+                    "hidden_voices": list(self.hidden_voice_ids),
+                    "bookmarks": self.bookmarks
+                }
+                json.dump(config, f)
         except: pass
 
 if __name__ == "__main__":

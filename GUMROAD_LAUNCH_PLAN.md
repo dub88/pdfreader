@@ -12,6 +12,8 @@
 
     **Key Features**:
     - **Premium Neural Voices**: Access Siri's best voices for free, offline, with no character limits.
+    - **Voice Customization**: Hide voices you don't like and preview voices with a single click to find your perfect narrator.
+    - **Bookmarks & Annotations**: Save noteworthy pages with custom notes to revisit your research or favorite chapters later.
     - **Synchronized Highlighting**: A visual focus frame follows the text as it’s read, perfect for deep work or learning.
     - **Smart Extraction**: Automatically skips headers, footers, and page numbers. Corrects common PDF artifacts like broken ligatures and "com- puter" hyphenation for a seamless "audiobook" flow.
     - **Native & Private**: Your documents never leave your computer. No internet required.

@@ -15,6 +15,8 @@ PDF Speaker is a native macOS app that lets you turn any PDF into a high-quality
 **Why it's different:**
 *   **Zero Subscriptions**: Buy it once, own it forever. It uses your native Mac voices, so it works completely offline.
 *   **Synchronized Highlighting**: A yellow "focus frame" follows the reading progress paragraph-by-paragraph, which is a game-changer for people with ADHD or those who learn better while reading along.
+*   **Bookmarks with Notes**: Don't just listen—interact. Save bookmarks with custom notes to mark important sections for later review.
+*   **Clean Voice Management**: Preview any voice instantly and hide the ones you'll never use. Focus on the premium neural voices that make reading a joy.
 *   **Smart Cleaning**: It doesn't just read the raw text. It intelligently skips headers, footers, and page numbers, and fixes common "PDF-isms" like broken line breaks and ligatures.
 *   **Privacy First**: Your documents never leave your machine. Period.
 
