@@ -31,6 +31,17 @@ class TTSEngine:
             "whisper", "zarvox", "organ"
         }
         
+        # LOGGING: Help the user debug their specific system
+        log_path = os.path.expanduser("~/Desktop/pdf_speaker_voice_debug.txt")
+        try:
+            with open(log_path, "w") as f:
+                f.write(f"PDF Speaker Voice Debug Log\n")
+                f.write(f"Total Voices Reported by macOS: {len(voices)}\n")
+                f.write("-" * 50 + "\n")
+                for v in voices:
+                    f.write(f"Name: {v.name()} | ID: {v.identifier()} | Lang: {v.language()} | Quality: {v.quality()}\n")
+        except: pass
+
         for v in voices:
             name = v.name()
             v_id = v.identifier()
@@ -38,15 +49,15 @@ class TTSEngine:
             quality_num = v.quality()
             quality = qualities.get(quality_num, "Standard")
             
-            # Siri detection logic: look for 'siri' or 'aaron' or 'nicky' or 'helena' etc
-            # Most modern Siri voices use the 'ttsvoice' prefix
-            is_siri = any(x in v_id.lower() for x in ["siri", "ttsvoice"]) or "siri" in name.lower()
+            # BROAD Siri detection: on Sequoia, IDs can be complex
+            is_siri = any(x in v_id.lower() for x in ["siri", "ttsvoice", "aaron", "nicky", "martha", "arthur", "helena"]) or "siri" in name.lower()
             is_personal = "personalvoice" in v_id.lower() or "personal" in name.lower()
             is_novelty = name.lower() in novelty_names or any(n in name.lower() for n in novelty_names)
             
-            # Highlight Premium/Neural voices
-            # Most Premium voices have 'premium' or 'neural' in ID
-            is_premium = quality_num >= 2 or any(x in v_id.lower() for x in ["premium", "neural", "enhanced"])
+            # If it's a Siri voice or Personal voice, it IS premium by definition
+            is_premium = (quality_num >= 2 or 
+                         any(x in v_id.lower() for x in ["premium", "neural", "enhanced", "siri", "ttsvoice"]) or
+                         is_siri or is_personal)
 
             results.append({
                 "id": v_id, 
