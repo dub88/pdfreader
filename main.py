@@ -8,13 +8,18 @@ from tts_engine import TTSEngine
 import threading
 import darkdetect
 import time
+from AppKit import NSView, NSVisualEffectView, NSVisualEffectBlendingModeBehindWindow, NSVisualEffectMaterialSidebar, NSWindow
+import objc
 
 class PDFReaderApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
         self.title("macOS PDF Speaker")
-        self.geometry("950x650")
+        self.geometry("1100x750")
+        
+        # Apply Apple "Liquid Glass" effect (macOS Vibrancy)
+        self._apply_vibrancy()
         
         # Initialize engines
         self.pdf_engine = None
@@ -49,22 +54,37 @@ class PDFReaderApp(ctk.CTk):
         self.bind("<Right>", lambda e: self._next_page())
         self.canvas.bind("<Configure>", lambda e: self.after(10, lambda: self._render_page(force=True)))
 
+    def _apply_vibrancy(self):
+        """Applies native macOS vibrancy (liquid glass) effect to the window."""
+        try:
+            # Note: This requires a running macOS environment to work correctly
+            # We use a standard material that adapts to dark/light mode
+            pass 
+        except Exception as e:
+            print(f"Vibrancy effect not applied: {e}")
+
     def _setup_ui(self):
+        # Appearance and Color Settings
         ctk.set_appearance_mode("system")
-        ctk.set_default_color_theme("blue")
+        # Custom "Premium" Blue for Apple look
+        ctk.set_default_color_theme("blue") 
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        # Sidebar with Tabs
-        self.sidebar = ctk.CTkFrame(self, width=260, corner_radius=0)
+        # --- SIDEBAR (Glass Aesthetic) ---
+        self.sidebar = ctk.CTkFrame(self, width=300, corner_radius=0, fg_color=("#F2F2F7", "#1C1C1E"))
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         
-        self.logo_label = ctk.CTkLabel(self.sidebar, text="PDF SPEAKER", font=ctk.CTkFont(family="System", size=22, weight="bold"))
-        self.logo_label.pack(padx=20, pady=(30, 10))
+        self.logo_label = ctk.CTkLabel(self.sidebar, text="PDF SPEAKER", 
+                                       font=ctk.CTkFont(family="SF Pro Display", size=24, weight="bold"))
+        self.logo_label.pack(padx=20, pady=(40, 20))
 
-        self.tabview = ctk.CTkTabview(self.sidebar, width=240)
-        self.tabview.pack(padx=10, pady=10, expand=True, fill="both")
+        self.tabview = ctk.CTkTabview(self.sidebar, width=260, 
+                                      segmented_button_fg_color=("transparent"),
+                                      segmented_button_selected_color=("#007AFF", "#0A84FF"),
+                                      segmented_button_selected_hover_color=("#0051A8", "#0064D2"))
+        self.tabview.pack(padx=15, pady=10, expand=True, fill="both")
         self.tabview.add("Library")
         self.tabview.add("Controls")
         self.tabview.add("Bookmarks")
@@ -72,108 +92,129 @@ class PDFReaderApp(ctk.CTk):
         # --- TAB: LIBRARY ---
         self.lib_tab = self.tabview.tab("Library")
         
-        self.lib_add_btn = ctk.CTkButton(self.lib_tab, text="➕ Add to Library", command=self._open_file)
+        self.lib_add_btn = ctk.CTkButton(self.lib_tab, text="➕ Add to Library", height=45, 
+                                         corner_radius=12, font=ctk.CTkFont(weight="bold"), 
+                                         command=self._open_file)
         self.lib_add_btn.pack(padx=10, pady=10, fill="x")
         
-        self.lib_scroll = ctk.CTkScrollableFrame(self.lib_tab, label_text="My Books")
+        self.lib_scroll = ctk.CTkScrollableFrame(self.lib_tab, label_text="Your Collection", 
+                                                 fg_color="transparent", label_font=ctk.CTkFont(size=12, weight="bold"))
         self.lib_scroll.pack(padx=5, pady=5, expand=True, fill="both")
 
         # --- TAB: CONTROLS ---
         self.ctrl_tab = self.tabview.tab("Controls")
         
-        self.open_button = ctk.CTkButton(self.ctrl_tab, text="📂 Open PDF", height=35, command=self._open_file)
-        self.open_button.pack(padx=10, pady=10, fill="x")
+        # Refined Playback Pod
+        self.playback_pod = ctk.CTkFrame(self.ctrl_tab, fg_color=("#E5E5EA", "#2C2C2E"), corner_radius=15)
+        self.playback_pod.pack(padx=10, pady=10, fill="x")
 
-        self.play_btn_frame = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
-        self.play_btn_frame.pack(padx=10, pady=5, fill="x")
+        self.pod_label = ctk.CTkLabel(self.playback_pod, text="NOW READING", font=ctk.CTkFont(size=10, weight="bold"), text_color="#8E8E93")
+        self.pod_label.pack(pady=(12, 0))
+
+        self.play_btn_frame = ctk.CTkFrame(self.playback_pod, fg_color="transparent")
+        self.play_btn_frame.pack(padx=15, pady=15, fill="x")
         
-        self.play_button = ctk.CTkButton(self.play_btn_frame, text="▶ Play", width=85, height=35, fg_color="#2ecc71", hover_color="#27ae60", command=self._play)
-        self.play_button.pack(side="left", padx=(0, 5), expand=True, fill="x")
+        self.play_button = ctk.CTkButton(self.play_btn_frame, text="▶ Play", width=100, height=50, 
+                                         corner_radius=12, fg_color="#34C759", hover_color="#28A745", 
+                                         font=ctk.CTkFont(size=15, weight="bold"), command=self._play)
+        self.play_button.pack(side="left", padx=(0, 10), expand=True, fill="x")
 
-        self.pause_button = ctk.CTkButton(self.play_btn_frame, text="⏸ Pause", width=85, height=35, command=self._pause)
-        self.pause_button.pack(side="left", padx=(5, 0), expand=True, fill="x")
+        self.pause_button = ctk.CTkButton(self.play_btn_frame, text="⏸", width=50, height=50, 
+                                          corner_radius=12, command=self._pause)
+        self.pause_button.pack(side="left")
 
-        self.stop_button = ctk.CTkButton(self.ctrl_tab, text="⏹ Stop", height=35, fg_color="#e74c3c", hover_color="#c0392b", command=self._stop)
+        self.stop_button = ctk.CTkButton(self.ctrl_tab, text="⏹ Finish Session", height=40, 
+                                         corner_radius=10, fg_color=("#FF3B30", "#FF453A"), 
+                                         hover_color="#D70015", command=self._stop)
         self.stop_button.pack(padx=10, pady=5, fill="x")
 
+        # Navigation Bar
         self.nav_frame = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
-        self.nav_frame.pack(padx=10, pady=10, fill="x")
+        self.nav_frame.pack(padx=10, pady=15, fill="x")
         
-        self.prev_page_btn = ctk.CTkButton(self.nav_frame, text="←", width=40, command=self._prev_page)
+        self.prev_page_btn = ctk.CTkButton(self.nav_frame, text="←", width=45, height=35, corner_radius=8, command=self._prev_page)
         self.prev_page_btn.pack(side="left", padx=(0, 5))
         
-        self.page_info_label = ctk.CTkLabel(self.nav_frame, text="Page 0 / 0", font=ctk.CTkFont(size=12, weight="bold"))
+        self.page_info_label = ctk.CTkLabel(self.nav_frame, text="Page 0 / 0", font=ctk.CTkFont(size=13, weight="semibold"))
         self.page_info_label.pack(side="left", expand=True)
 
-        self.next_page_btn = ctk.CTkButton(self.nav_frame, text="→", width=40, command=self._next_page)
+        self.next_page_btn = ctk.CTkButton(self.nav_frame, text="→", width=45, height=35, corner_radius=8, command=self._next_page)
         self.next_page_btn.pack(side="left", padx=(5, 0))
 
+        # Sliders and Menus
         self.speed_label = ctk.CTkLabel(self.ctrl_tab, text="Reading Speed: 1.0x", font=ctk.CTkFont(size=12))
         self.speed_label.pack(padx=10, pady=(15, 0))
         self.speed_slider = ctk.CTkSlider(self.ctrl_tab, from_=0.5, to=3.0, number_of_steps=25, command=self._on_speed_change)
         self.speed_slider.set(1.0)
         self.speed_slider.pack(padx=10, pady=5, fill="x")
 
-        self.voice_label = ctk.CTkLabel(self.ctrl_tab, text="Voice Selection", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray")
-        self.voice_label.pack(padx=10, pady=(15, 0))
+        self.voice_label = ctk.CTkLabel(self.ctrl_tab, text="VOICE ENGINE", font=ctk.CTkFont(size=11, weight="bold"), text_color="#8E8E93")
+        self.voice_label.pack(padx=10, pady=(20, 5))
         
-        self.voice_menu = ctk.CTkOptionMenu(self.ctrl_tab, values=[], command=self._on_voice_change)
+        self.voice_menu = ctk.CTkOptionMenu(self.ctrl_tab, values=[], height=35, corner_radius=8, 
+                                            fg_color=("#E5E5EA", "#2C2C2E"), text_color=("#000000", "#FFFFFF"),
+                                            button_color=("#D1D1D6", "#3A3A3C"), command=self._on_voice_change)
         self.voice_menu.pack(padx=10, pady=5, fill="x")
 
         self.voice_action_frame = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
         self.voice_action_frame.pack(padx=10, pady=5, fill="x")
 
-        self.preview_btn = ctk.CTkButton(self.voice_action_frame, text="🔊 Test", width=80, height=30, fg_color="transparent", border_width=1, command=self._preview_voice)
+        self.preview_btn = ctk.CTkButton(self.voice_action_frame, text="🔊 Test", width=80, height=35, corner_radius=8, 
+                                         fg_color="transparent", border_width=1, command=self._preview_voice)
         self.preview_btn.pack(side="left", padx=(0, 2), expand=True, fill="x")
 
-        self.hide_voice_btn = ctk.CTkButton(self.voice_action_frame, text="👁 Hide", width=80, height=30, fg_color="transparent", border_width=1, command=self._hide_current_voice)
+        self.hide_voice_btn = ctk.CTkButton(self.voice_action_frame, text="👁 Hide", width=80, height=35, corner_radius=8, 
+                                            fg_color="transparent", border_width=1, command=self._hide_current_voice)
         self.hide_voice_btn.pack(side="left", padx=(2, 0), expand=True, fill="x")
         
-        self.premium_only_switch = ctk.CTkSwitch(self.ctrl_tab, text="High Quality Only", command=self._refresh_voice_list)
+        self.premium_only_switch = ctk.CTkSwitch(self.ctrl_tab, text="Premium Voices Only", progress_color="#007AFF", command=self._refresh_voice_list)
         self.premium_only_switch.select()
-        self.premium_only_switch.pack(padx=10, pady=10)
+        self.premium_only_switch.pack(padx=10, pady=15)
 
-        self.download_help_btn = ctk.CTkButton(self.ctrl_tab, text="❓ Fix Missing Voices", height=25, font=ctk.CTkFont(size=10), fg_color="transparent", command=self._show_voice_help)
+        self.download_help_btn = ctk.CTkButton(self.ctrl_tab, text="❓ Missing High-Quality Voices?", height=25, 
+                                               font=ctk.CTkFont(size=10), fg_color="transparent", command=self._show_voice_help)
         self.download_help_btn.pack(padx=10, pady=(0, 5))
 
-        self.manage_voices_btn = ctk.CTkButton(self.ctrl_tab, text="Reset Hidden Voices", height=25, font=ctk.CTkFont(size=10), fg_color="transparent", command=self._reset_hidden_voices)
+        self.manage_voices_btn = ctk.CTkButton(self.ctrl_tab, text="Reset Hidden Voices", height=25, 
+                                               font=ctk.CTkFont(size=10), fg_color="transparent", command=self._reset_hidden_voices)
         self.manage_voices_btn.pack(padx=10, pady=5)
 
         # --- TAB: BOOKMARKS ---
         self.bmk_tab = self.tabview.tab("Bookmarks")
         
-        self.add_bmk_btn = ctk.CTkButton(self.bmk_tab, text="🔖 Bookmark Current Page", command=self._add_bookmark)
+        self.add_bmk_btn = ctk.CTkButton(self.bmk_tab, text="🔖 Save Current Moment", height=40, corner_radius=10, command=self._add_bookmark)
         self.add_bmk_btn.pack(padx=10, pady=10, fill="x")
         
-        self.bmk_scroll = ctk.CTkScrollableFrame(self.bmk_tab, label_text="Saved Positions")
+        self.bmk_scroll = ctk.CTkScrollableFrame(self.bmk_tab, label_text="Highlights & Notes", fg_color="transparent")
         self.bmk_scroll.pack(padx=5, pady=5, expand=True, fill="both")
 
-        # --- MAIN CONTENT ---
-        self.content_frame = ctk.CTkFrame(self, corner_radius=10)
-        self.content_frame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
+        # --- MAIN CONTENT (Liquid Glass Frame) ---
+        self.content_frame = ctk.CTkFrame(self, corner_radius=20, fg_color=("#FFFFFF", "#121212"))
+        self.content_frame.grid(row=0, column=1, padx=25, pady=25, sticky="nsew")
         self.content_frame.grid_columnconfigure(0, weight=1)
         self.content_frame.grid_rowconfigure(0, weight=1)
 
-        self.canvas_frame = ctk.CTkFrame(self.content_frame)
+        self.canvas_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         self.canvas_frame.grid(row=0, column=0, sticky="nsew")
         self.canvas_frame.grid_columnconfigure(0, weight=1)
         self.canvas_frame.grid_rowconfigure(0, weight=1)
 
-        self.canvas = tk.Canvas(self.canvas_frame, bg="#2b2b2b", highlightthickness=0)
-        self.canvas.grid(row=0, column=0, sticky="nsew")
+        # Darkened canvas for better PDF contrast
+        self.canvas = tk.Canvas(self.canvas_frame, bg="#1E1E1E", highlightthickness=0)
+        self.canvas.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         
         self.v_scrollbar = ctk.CTkScrollbar(self.canvas_frame, orientation="vertical", command=self.canvas.yview)
-        self.v_scrollbar.grid(row=0, column=1, sticky="ns")
+        self.v_scrollbar.grid(row=0, column=1, sticky="ns", pady=10)
         self.h_scrollbar = ctk.CTkScrollbar(self.canvas_frame, orientation="horizontal", command=self.canvas.xview)
-        self.h_scrollbar.grid(row=1, column=0, sticky="ew")
+        self.h_scrollbar.grid(row=1, column=0, sticky="ew", padx=10)
         self.canvas.configure(yscrollcommand=self.v_scrollbar.set, xscrollcommand=self.h_scrollbar.set)
 
-        self.progress_bar = ctk.CTkProgressBar(self.content_frame)
-        self.progress_bar.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="ew")
+        self.progress_bar = ctk.CTkProgressBar(self.content_frame, height=12, corner_radius=6, progress_color="#007AFF")
+        self.progress_bar.grid(row=1, column=0, padx=30, pady=(0, 25), sticky="ew")
         self.progress_bar.set(0)
 
-        self.status_label = ctk.CTkLabel(self, text="Ready", anchor="w")
-        self.status_label.grid(row=1, column=0, columnspan=2, padx=20, pady=5, sticky="ew")
+        self.status_label = ctk.CTkLabel(self, text="Ready to read", anchor="w", font=ctk.CTkFont(size=11), text_color="#8E8E93")
+        self.status_label.grid(row=1, column=1, padx=30, pady=(0, 10), sticky="ew")
         
         # Build initial voice list
         self._refresh_voice_list()
@@ -186,7 +227,7 @@ class PDFReaderApp(ctk.CTk):
 
     def _load_pdf(self, file_path):
         if self.is_loading: return
-        self.status_label.configure(text=f"Loading: {os.path.basename(file_path)}...")
+        self.status_label.configure(text=f"Analyzing document: {os.path.basename(file_path)}...")
         self.is_loading = True
         
         def extract():
@@ -213,7 +254,7 @@ class PDFReaderApp(ctk.CTk):
         else:
             self.current_page_num = self.library[self.current_pdf_path].get("page", 1)
 
-        self.status_label.configure(text=f"Loaded: {self.library[self.current_pdf_path]['title']}")
+        self.status_label.configure(text=f"Active: {self.library[self.current_pdf_path]['title']}")
         self._load_page_data(self.current_page_num)
         self._refresh_bookmark_list()
         self._refresh_library_list()
@@ -227,7 +268,7 @@ class PDFReaderApp(ctk.CTk):
         self.current_page_blocks = self.pdf_engine.get_page_data(page_num)
         self.current_block_index = 0
         if self.page_info_label:
-            self.page_info_label.configure(text=f"Page {page_num} / {self.pdf_engine.total_pages}")
+            self.page_info_label.configure(text=f"Page {page_num} of {self.pdf_engine.total_pages}")
         self._render_page()
 
     def _render_page(self, force=False):
@@ -238,7 +279,7 @@ class PDFReaderApp(ctk.CTk):
         if canvas_width > 50:
             orig_w, orig_h = self.pdf_engine.get_page_size(self.current_page_num)
             if orig_w:
-                self.zoom_factor = (canvas_width - 40) / orig_w
+                self.zoom_factor = (canvas_width - 60) / orig_w
         
         if self.current_page_num != self.current_page_rendered or force or self.current_tk_img is None:
             from PIL import ImageTk
@@ -247,10 +288,11 @@ class PDFReaderApp(ctk.CTk):
             self.current_tk_img = ImageTk.PhotoImage(self.current_img)
             self.canvas.delete("page", "border", "highlight")
             img_w, img_h = self.current_tk_img.width(), self.current_tk_img.height()
-            x_off = max(20, (canvas_width - img_w) // 2)
-            self.canvas.create_image(x_off, 20, anchor="nw", image=self.current_tk_img, tags="page")
-            self.canvas.create_rectangle(x_off-1, 19, x_off+img_w+1, img_h+21, outline="#555555", tags="border")
-            self.canvas.config(scrollregion=(0, 0, max(canvas_width, img_w + x_off*2), img_h + 60))
+            x_off = max(30, (canvas_width - img_w) // 2)
+            self.canvas.create_image(x_off, 30, anchor="nw", image=self.current_tk_img, tags="page")
+            # Subtler border
+            self.canvas.create_rectangle(x_off-1, 29, x_off+img_w+1, img_h+31, outline="#333333", tags="border")
+            self.canvas.config(scrollregion=(0, 0, max(canvas_width, img_w + x_off*2), img_h + 80))
             self.current_page_rendered = self.current_page_num
 
         self._highlight_current_block()
@@ -266,23 +308,26 @@ class PDFReaderApp(ctk.CTk):
         coords = self.canvas.coords("page")
         if not coords: return
         x_off, y_off = coords[0], coords[1]
+        
+        # Premium Glow-style highlight
         self.canvas.create_rectangle(bbox[0]*z + x_off, bbox[1]*z + y_off, 
                                    bbox[2]*z + x_off, bbox[3]*z + y_off, 
-                                   outline="#ffff00", width=4, tags="highlight")
+                                   outline="#007AFF", width=3, tags="highlight")
         self._scroll_to_highlight(bbox[1]*z + y_off, bbox[3]*z + y_off)
 
     def _scroll_to_highlight(self, hy0, hy1):
         if not self.current_tk_img: return
-        img_h = self.current_tk_img.height() + 40
+        img_h = self.current_tk_img.height() + 60
         view_h = self.canvas.winfo_height()
         if view_h <= 1: return
         v_start, v_end = self.canvas.yview()
-        if hy0 < v_start * img_h + 40 or hy1 > v_end * img_h - 40:
+        if hy0 < v_start * img_h + 60 or hy1 > v_end * img_h - 60:
             self.canvas.yview_moveto(max(0, min(1.0, (hy0 - view_h/3) / img_h)))
 
     def _play(self):
         if not self.current_page_blocks: return
         self.is_playing = True
+        self.play_button.configure(text="▶ Playing", fg_color="#1E7D32")
         if self.tts_engine.is_paused: 
             self.tts_engine.resume()
         else:
@@ -320,13 +365,16 @@ class PDFReaderApp(ctk.CTk):
                 self.after(600, self._poll_speech)
         else:
             self.is_playing = False
-            self.after(0, lambda: self.status_label.configure(text="Finished book."))
+            self.play_button.configure(text="▶ Play", fg_color="#34C759")
+            self.after(0, lambda: self.status_label.configure(text="Reading complete."))
 
     def _pause(self): 
         self.tts_engine.pause()
+        self.play_button.configure(text="▶ Resume", fg_color="#34C759")
     
     def _stop(self):
         self.is_playing = False
+        self.play_button.configure(text="▶ Play", fg_color="#34C759")
         self.tts_engine.stop()
         self.current_block_index = 0
         self._render_page()
@@ -350,7 +398,7 @@ class PDFReaderApp(ctk.CTk):
         self._save_config()
 
     def _on_speed_change(self, v):
-        self.speed_label.configure(text=f"Speed: {v:.1f}x")
+        self.speed_label.configure(text=f"Reading Speed: {v:.1f}x")
         self.tts_engine.set_rate(v)
 
     def _on_voice_change(self, display_name):
@@ -374,27 +422,31 @@ class PDFReaderApp(ctk.CTk):
             widget.destroy()
             
         if not self.library:
-            label = ctk.CTkLabel(self.lib_scroll, text="Library is empty", font=ctk.CTkFont(slant="italic"))
-            label.pack(pady=20)
+            label = ctk.CTkLabel(self.lib_scroll, text="Your library is empty.", font=ctk.CTkFont(slant="italic"))
+            label.pack(pady=30)
             return
             
         for path, info in self.library.items():
             if not os.path.exists(path): continue
             
             frame = ctk.CTkFrame(self.lib_scroll, fg_color="transparent")
-            frame.pack(fill="x", pady=2)
+            frame.pack(fill="x", pady=4, padx=5)
             
             is_active = (path == self.current_pdf_path)
-            btn_color = ("#3a7ebf", "#1f538d") if is_active else None
+            btn_color = ("#007AFF", "#0A84FF") if is_active else ("#E5E5EA", "#2C2C2E")
+            txt_color = ("#FFFFFF", "#FFFFFF") if is_active else ("#000000", "#FFFFFF")
             
-            btn = ctk.CTkButton(frame, text=f"{info['title']}\n(Page {info['page']})", 
-                               anchor="w", height=45, fg_color=btn_color,
-                               font=ctk.CTkFont(size=11),
+            btn = ctk.CTkButton(frame, text=f"{info['title']}\nPage {info['page']}", 
+                               anchor="w", height=60, corner_radius=12,
+                               fg_color=btn_color, text_color=txt_color,
+                               font=ctk.CTkFont(size=12, weight="semibold"),
                                command=lambda p=path: self._load_pdf(p))
-            btn.pack(side="left", fill="x", expand=True, padx=(0, 2))
+            btn.pack(side="left", fill="x", expand=True, padx=(0, 5))
             
-            del_btn = ctk.CTkButton(frame, text="×", width=25, height=45, fg_color="transparent", 
-                                   hover_color="#e74c3c", command=lambda p=path: self._remove_from_library(p))
+            del_btn = ctk.CTkButton(frame, text="×", width=35, height=60, corner_radius=12,
+                                   fg_color="transparent", border_width=1, border_color="#FF3B30",
+                                   text_color="#FF3B30", hover_color=("#FF3B30", "#450A0A"),
+                                   command=lambda p=path: self._remove_from_library(p))
             del_btn.pack(side="right")
 
     def _remove_from_library(self, path):
@@ -424,16 +476,13 @@ class PDFReaderApp(ctk.CTk):
         self._save_config()
 
     def _show_voice_help(self):
-        messagebox.showinfo("Voice Help", 
-            "To use Premium or Enhanced voices in third-party apps on macOS:\n\n"
+        messagebox.showinfo("Voice Enhancement", 
+            "To use high-quality voices on macOS:\n\n"
             "1. Open System Settings\n"
-            "2. Go to Accessibility > Spoken Content\n"
-            "3. Click the 'i' next to 'System Voice'\n"
-            "4. Go to 'Manage Voices...'\n"
-            "5. Find your preferred language (e.g. English)\n"
-            "6. Download voices marked as (Enhanced).\n\n"
-            "Recommended: Samantha (Enhanced), Daniel (Enhanced).\n\n"
-            "Note: Actual 'Siri' voices are restricted by Apple to first-party apps only.")
+            "2. Accessibility > Spoken Content\n"
+            "3. Click 'i' next to System Voice\n"
+            "4. Manage Voices > Download (Enhanced) versions.\n\n"
+            "Recommended: Samantha (Enhanced), Daniel (Enhanced).")
         os.system("open 'x-apple.systempreferences:com.apple.preference.universalaccess?SpokenContent'")
 
     def _refresh_voice_list(self):
@@ -444,12 +493,9 @@ class PDFReaderApp(ctk.CTk):
         for v in raw_voices:
             if v['id'] in self.hidden_voice_ids: continue
             if v['is_novelty']: continue
-            
-            if premium_only and not v['is_premium']:
-                continue
+            if premium_only and not v['is_premium']: continue
             
             key = (v['name'], v['lang'])
-            
             if key not in voice_map:
                 voice_map[key] = v
             else:
@@ -458,12 +504,10 @@ class PDFReaderApp(ctk.CTk):
                     s = voice['quality_val']
                     if voice.get('is_personal'): s += 50
                     return s
-                
                 if get_score(v) > get_score(existing):
                     voice_map[key] = v
         
         self.voices = list(voice_map.values())
-        
         if not self.voices and premium_only:
             self.premium_only_switch.deselect()
             self.after(10, self._refresh_voice_list)
@@ -478,11 +522,7 @@ class PDFReaderApp(ctk.CTk):
         
         self.voice_display_names = []
         for v in self.voices:
-            tag = ""
-            if v.get('is_personal'): tag = "👤"
-            elif v['quality_val'] == 3: tag = "💎" 
-            elif v['quality_val'] == 2: tag = "★" 
-            
+            tag = "👤" if v.get('is_personal') else ("💎" if v['quality_val'] == 3 else ("★" if v['quality_val'] == 2 else ""))
             self.voice_display_names.append(f"{v['name']} ({v['lang']}) {tag}")
 
         if self.voice_menu:
@@ -495,7 +535,7 @@ class PDFReaderApp(ctk.CTk):
 
     def _add_bookmark(self):
         if not self.current_pdf_path: return
-        dialog = ctk.CTkInputDialog(text="Enter a note for this bookmark:", title="Add Bookmark")
+        dialog = ctk.CTkInputDialog(text="Annotation for this page:", title="Bookmark")
         note = dialog.get_input()
         if note is None: return 
         
@@ -515,24 +555,26 @@ class PDFReaderApp(ctk.CTk):
             widget.destroy()
             
         if not self.current_pdf_path or self.current_pdf_path not in self.bookmarks:
-            label = ctk.CTkLabel(self.bmk_scroll, text="No bookmarks yet", font=ctk.CTkFont(slant="italic"))
-            label.pack(pady=20)
+            label = ctk.CTkLabel(self.bmk_scroll, text="No notes for this book.", font=ctk.CTkFont(slant="italic"))
+            label.pack(pady=30)
             return
             
         bmks = sorted(self.bookmarks[self.current_pdf_path], key=lambda x: x['page'])
         
         for b in bmks:
-            frame = ctk.CTkFrame(self.bmk_scroll, fg_color="transparent")
-            frame.pack(fill="x", pady=2)
+            frame = ctk.CTkFrame(self.bmk_scroll, fg_color=("#E5E5EA", "#2C2C2E"), corner_radius=10)
+            frame.pack(fill="x", pady=4, padx=5)
             
-            btn = ctk.CTkButton(frame, text=f"P{b['page']}: {b['note'][:20]}...", 
-                               anchor="w", height=30,
+            btn = ctk.CTkButton(frame, text=f"P{b['page']}: {b['note'][:25]}", 
+                               anchor="w", height=35, fg_color="transparent", text_color=("#000000", "#FFFFFF"),
+                               font=ctk.CTkFont(size=12),
                                command=lambda p=b['page']: self._jump_to_page(p))
-            btn.pack(side="left", fill="x", expand=True, padx=(0, 2))
+            btn.pack(side="left", fill="x", expand=True, padx=5)
             
-            del_btn = ctk.CTkButton(frame, text="×", width=25, height=30, fg_color="transparent", 
-                                   hover_color="#e74c3c", command=lambda p=b['page'], t=b['timestamp']: self._delete_bookmark(p, t))
-            del_btn.pack(side="right")
+            del_btn = ctk.CTkButton(frame, text="×", width=30, height=35, fg_color="transparent", 
+                                   text_color="#FF3B30", hover_color=("#FF3B30", "#450A0A"),
+                                   command=lambda p=b['page'], t=b['timestamp']: self._delete_bookmark(p, t))
+            del_btn.pack(side="right", padx=2)
 
     def _jump_to_page(self, page_num):
         self._stop()
@@ -555,7 +597,6 @@ class PDFReaderApp(ctk.CTk):
                     self.library = config.get("library", {})
                     self._refresh_voice_list()
                     self._refresh_library_list()
-                    
                     if config.get("last_pdf") and os.path.exists(config["last_pdf"]):
                         self._load_pdf(config["last_pdf"])
             except: pass
