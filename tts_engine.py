@@ -26,9 +26,11 @@ class TTSDelegate(NSObject):
 class TTSEngine:
     def __init__(self, on_word_callback=None):
         self._synth = AVSpeechSynthesizer.alloc().init()
-        # Delegate disabled to prevent GIL threading crash
-        # self._delegate = TTSDelegate.alloc().initWithCallback_(on_word_callback)
-        # self._synth.setDelegate_(self._delegate)
+        
+        # Word-level callback setup
+        if on_word_callback:
+            self._delegate = TTSDelegate.alloc().initWithCallback_(on_word_callback)
+            self._synth.setDelegate_(self._delegate)
         
         self._voice = None
         self._rate = 0.5 
@@ -36,6 +38,7 @@ class TTSEngine:
         self.is_paused = False
 
     def get_voices(self) -> List[Dict]:
+        """Returns a list of available macOS voices with metadata."""
         voices = AVSpeechSynthesisVoice.speechVoices()
         results = []
         qualities = {1: "Standard", 2: "Enhanced", 3: "Premium"}

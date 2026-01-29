@@ -25,7 +25,7 @@ class AudileApp(ctk.CTk):
         
         # Initialize engines
         self.pdf_engine = None
-        # Word callback uses .after to safely update UI from TTS thread
+        # Word callback uses .after to safely update UI from TTS thread (Avoids GIL crash)
         self.tts_engine = TTSEngine(on_word_callback=lambda l, le: self.after(0, self._on_word_spoken, l, le))
         
         # State
