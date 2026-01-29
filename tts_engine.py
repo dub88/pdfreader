@@ -17,19 +17,43 @@ class TTSEngine:
         self.is_paused = False
 
     def get_voices(self) -> List[Dict]:
-        """Returns a list of available macOS voices using the modern AVFoundation API."""
+        """Returns a list of available macOS voices with metadata."""
         voices = AVSpeechSynthesisVoice.speechVoices()
         results = []
+        
+        # Mapping for quality enums
+        qualities = {1: "Standard", 2: "Enhanced", 3: "Premium"}
+        
         for v in voices:
             name = v.name()
             v_id = v.identifier()
-            # Clean up name: "Siri (com.apple.ttsvoice.siri-alex)" -> "Siri (Alex)"
-            # Usually name() is already clean like "Siri" or "Samantha"
-            results.append({"id": v_id, "name": name})
+            lang = v.language()
+            quality_num = v.quality()
+            quality = qualities.get(quality_num, "Standard")
+            
+            # Clean up language (e.g., "en-US" -> "English")
+            # For now, keep the code short and just use the locale
+            
+            results.append({
+                "id": v_id, 
+                "name": name, 
+                "lang": lang, 
+                "quality": quality,
+                "quality_val": quality_num
+            })
         return results
 
-    def set_voice(self, voice_id: str):
-        self._voice = AVSpeechSynthesisVoice.voiceWithIdentifier_(voice_id)
+    def preview(self, voice_id: str):
+        """Speaks a short preview sentence using the selected voice."""
+        self.stop()
+        preview_text = "Hello, I am a high-quality voice on your Mac. I can read your documents with natural prosody."
+        
+        # Check if the voice is non-English to provide a better preview
+        voice = AVSpeechSynthesisVoice.voiceWithIdentifier_(voice_id)
+        if voice and not voice.language().startswith("en"):
+            preview_text = "Hello, I am a native voice. I can read documents in my language, or read English with my natural accent."
+
+        self.speak(preview_text)
 
     def set_rate(self, rate: float):
         """

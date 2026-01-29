@@ -96,16 +96,36 @@ class PDFReaderApp(ctk.CTk):
         self.speed_slider.set(1.0)
         self.speed_slider.grid(row=9, column=0, padx=20, pady=5)
 
-        self.voices = self.tts_engine.get_voices()
-        self.voices.sort(key=lambda v: ("siri" not in v['name'].lower() and "siri" not in v['id'].lower()))
+        self.voice_label = ctk.CTkLabel(self.sidebar, text="VOICE", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray")
+        self.voice_label.grid(row=10, column=0, padx=20, pady=(20, 5))
         
-        self.voice_names = [v['name'] for v in self.voices]
-        self.voice_menu = ctk.CTkOptionMenu(self.sidebar, values=self.voice_names, command=self._on_voice_change)
-        self.voice_menu.grid(row=10, column=0, padx=20, pady=20)
+        # Get and filter voices
+        raw_voices = self.tts_engine.get_voices()
+        voice_map = {}
+        for v in raw_voices:
+            # Keep only the highest quality for each name+lang combo
+            key = (v['name'], v['lang'])
+            if key not in voice_map or v['quality_val'] > voice_map[key]['quality_val']:
+                voice_map[key] = v
+        
+        self.voices = list(voice_map.values())
+        self.voices.sort(key=lambda v: (
+            "siri" not in v['name'].lower() and "siri" not in v['id'].lower(),
+            not v['lang'].startswith("en"),
+            v['name']
+        ))
+        
+        self.voice_display_names = [f"{v['name']} ({v['lang']}) {'★' if v['quality_val'] > 1 else ''}" for v in self.voices]
+        self.voice_menu = ctk.CTkOptionMenu(self.sidebar, values=self.voice_display_names, command=self._on_voice_change)
+        self.voice_menu.grid(row=11, column=0, padx=20, pady=5)
+
+        self.preview_btn = ctk.CTkButton(self.sidebar, text="🔊 Preview Voice", height=30, fg_color="transparent", border_width=1, command=self._preview_voice)
+        self.preview_btn.grid(row=12, column=0, padx=20, pady=10)
 
         siri_voice = next((v for v in self.voices if "siri" in v['name'].lower()), None)
         if siri_voice:
-            self.voice_menu.set(siri_voice['name'])
+            idx = self.voices.index(siri_voice)
+            self.voice_menu.set(self.voice_display_names[idx])
             self.tts_engine.set_voice(siri_voice['id'])
 
         self.content_frame = ctk.CTkFrame(self, corner_radius=10)
@@ -305,9 +325,16 @@ class PDFReaderApp(ctk.CTk):
         self.speed_label.configure(text=f"Speed: {v:.1f}x")
         self.tts_engine.set_rate(v)
 
-    def _on_voice_change(self, name):
-        for v in self.voices:
-            if v['name'] == name: self.tts_engine.set_voice(v['id']); break
+    def _on_voice_change(self, display_name):
+        idx = self.voice_display_names.index(display_name)
+        voice = self.voices[idx]
+        self.tts_engine.set_voice(voice['id'])
+
+    def _preview_voice(self):
+        current_voice_display = self.voice_menu.get()
+        idx = self.voice_display_names.index(current_voice_display)
+        voice = self.voices[idx]
+        self.tts_engine.preview(voice['id'])
 
     def _load_config(self):
         if os.path.exists(self.config_file):
