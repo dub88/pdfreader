@@ -19,7 +19,7 @@ class TTSDelegate(NSObject):
         return self
 
     def speechSynthesizer_willSpeakRangeOfSpeechString_utterance_(self, synth, char_range, utterance):
-        # char_range is an NSRange (location, length)
+        # Notify the main thread via callback
         if self._callback:
             self._callback(char_range.location, char_range.length)
 
@@ -35,7 +35,6 @@ class TTSEngine:
         self.is_paused = False
 
     def get_voices(self) -> List[Dict]:
-        """Returns a list of available macOS voices with metadata."""
         voices = AVSpeechSynthesisVoice.speechVoices()
         results = []
         qualities = {1: "Standard", 2: "Enhanced", 3: "Premium"}
@@ -61,7 +60,6 @@ class TTSEngine:
                 "lang": lang, 
                 "quality": qualities.get(quality_num, "Standard"),
                 "quality_val": quality_num,
-                "is_siri": False, 
                 "is_personal": is_personal,
                 "is_novelty": is_novelty,
                 "is_premium": is_premium
@@ -70,7 +68,7 @@ class TTSEngine:
 
     def preview(self, voice_id: str):
         self.stop()
-        self.speak("Hello, I am a high-quality voice on your Mac.")
+        self.speak("Hello, this is your high-quality narrator.")
 
     def set_voice(self, voice_id: str):
         self._voice = AVSpeechSynthesisVoice.voiceWithIdentifier_(voice_id)
@@ -81,34 +79,12 @@ class TTSEngine:
 
     def speak(self, text: str):
         self.is_paused = False
-        
-        # PRE-PROCESS: Fix Year Pronunciation (e.g. 1975 -> nineteen seventy five)
-        processed_text = self._fix_years(text)
-        
-        utterance = AVSpeechUtterance.speechUtteranceWithString_(processed_text)
+        utterance = AVSpeechUtterance.speechUtteranceWithString_(text)
         if self._voice:
             utterance.setVoice_(self._voice)
         utterance.setRate_(self._rate)
         utterance.setVolume_(self._volume)
         self._synth.speakUtterance_(utterance)
-
-    def _fix_years(self, text: str) -> str:
-        """Regex to find 4-digit years and make them phonetic."""
-        def year_repl(match):
-            year = match.group(0)
-            # Only process likely years (1800-2099)
-            y_int = int(year)
-            if 1800 <= y_int <= 2099:
-                # Handle 2000-2009 differently
-                if 2000 <= y_int <= 2009:
-                    return f"two thousand {y_int % 100 if y_int % 100 > 0 else ''}"
-                else:
-                    first_half = year[:2]
-                    second_half = year[2:]
-                    return f"{first_half} {second_half}"
-            return year
-            
-        return re.sub(r'\b\d{4}\b', year_repl, text)
 
     def is_speaking(self) -> bool:
         return self._synth.isSpeaking()
