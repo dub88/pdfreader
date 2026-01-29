@@ -73,7 +73,12 @@ class TTSEngine:
 
         self.speak(preview_text)
 
+    def set_voice(self, voice_id: str):
+        """Sets the voice to be used for speech."""
+        self._voice = AVSpeechSynthesisVoice.voiceWithIdentifier_(voice_id)
+
     def set_rate(self, rate: float):
+
         """
         AVFoundation rate scale is different. 
         0.5 is normal speed. 0.0 is very slow, 1.0 is very fast.
