@@ -32,7 +32,7 @@ class TTSEngine:
             "ralph", "trinoids", "whisper", "zarvox", "eloquence", "jester", "wobble", "superstar"
         }
         
-        # LOGGING: Detailed log to Desktop
+        # LOGGING: Help find Siri on Sequoia
         log_path = os.path.expanduser("~/Desktop/pdf_speaker_voice_debug.txt")
         try:
             with open(log_path, "w") as f:
@@ -40,8 +40,8 @@ class TTSEngine:
                 f.write(f"Total Voices Detected: {len(voices)}\n")
                 f.write("-" * 50 + "\n")
                 for v in voices:
-                    v_id = v.identifier().lower()
-                    is_siri_id = any(x in v_id for x in ["siri", "ttsvoice", "aaron", "nicky", "martha", "arthur", "helena"])
+                    f_id = v.identifier().lower()
+                    is_siri_id = any(x in f_id for x in ["siri", "ttsvoice", "aaron", "nicky", "martha", "arthur", "helena"])
                     f.write(f"Name: {v.name()} | ID: {v.identifier()} | Quality: {v.quality()} | SiriID: {is_siri_id}\n")
         except: pass
 
@@ -51,20 +51,18 @@ class TTSEngine:
             lang = v.language()
             quality_num = v.quality()
             
-            # Siri detection logic
-            is_siri = any(x in v_id for x in ["siri", "ttsvoice", "aaron", "nicky", "martha", "arthur", "helena"]) or "siri" in name.lower()
+            # Personal voice detection (Still works!)
             is_personal = "personalvoice" in v_id or "personal" in name.lower()
             
             # Hide novelty/creepy voices
             is_novelty = any(x in v_id for x in creepy_keywords) or any(x in name.lower() for x in ["bad news", "good news", "pipe organ", "jester", "wobble", "superstar"])
             
             # High-Quality detection
-            # CRITICAL FIX: If quality is 1 but it's not a 'compact' or 'creepy' voice, 
-            # we treat it as premium to avoid an empty list on Sequoia.
             is_compact = "compact" in v_id
+            # On Sequoia, we treat everything non-compact/non-creepy as high quality because quality_num is buggy
             is_premium = (quality_num >= 2 or 
-                         is_siri or is_personal or 
-                         (not is_compact and not is_novelty))
+                         is_personal or 
+                         ("compact" not in v_id and not is_novelty))
 
             results.append({
                 "id": v.identifier(), 
@@ -72,7 +70,7 @@ class TTSEngine:
                 "lang": lang, 
                 "quality": qualities.get(quality_num, "Standard"),
                 "quality_val": quality_num,
-                "is_siri": is_siri,
+                "is_siri": False, # Siri is restricted in 3rd party apps
                 "is_personal": is_personal,
                 "is_novelty": is_novelty,
                 "is_premium": is_premium

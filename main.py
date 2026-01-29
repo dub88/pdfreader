@@ -133,7 +133,7 @@ class PDFReaderApp(ctk.CTk):
         self.premium_only_switch.select()
         self.premium_only_switch.pack(padx=10, pady=10)
 
-        self.download_help_btn = ctk.CTkButton(self.ctrl_tab, text="❓ Fix Missing Siri Voices", height=25, font=ctk.CTkFont(size=10), fg_color="transparent", command=self._show_voice_help)
+        self.download_help_btn = ctk.CTkButton(self.ctrl_tab, text="❓ Fix Missing Voices", height=25, font=ctk.CTkFont(size=10), fg_color="transparent", command=self._show_voice_help)
         self.download_help_btn.pack(padx=10, pady=(0, 5))
 
         self.manage_voices_btn = ctk.CTkButton(self.ctrl_tab, text="Reset Hidden Voices", height=25, font=ctk.CTkFont(size=10), fg_color="transparent", command=self._reset_hidden_voices)
@@ -205,14 +205,12 @@ class PDFReaderApp(ctk.CTk):
         threading.Thread(target=extract, daemon=True).start()
 
     def _on_pdf_loaded(self):
-        # Update library with this PDF if not already present
         if self.current_pdf_path not in self.library:
             self.library[self.current_pdf_path] = {
                 "page": self.current_page_num,
                 "title": os.path.basename(self.current_pdf_path)
             }
         else:
-            # If already in library, use the saved page number
             self.current_page_num = self.library[self.current_pdf_path].get("page", 1)
 
         self.status_label.configure(text=f"Loaded: {self.library[self.current_pdf_path]['title']}")
@@ -223,7 +221,6 @@ class PDFReaderApp(ctk.CTk):
 
     def _load_page_data(self, page_num):
         self.current_page_num = page_num
-        # Update current page in library state
         if self.current_pdf_path in self.library:
             self.library[self.current_pdf_path]["page"] = page_num
             
@@ -387,7 +384,6 @@ class PDFReaderApp(ctk.CTk):
             frame = ctk.CTkFrame(self.lib_scroll, fg_color="transparent")
             frame.pack(fill="x", pady=2)
             
-            # Highlight current book
             is_active = (path == self.current_pdf_path)
             btn_color = ("#3a7ebf", "#1f538d") if is_active else None
             
@@ -429,14 +425,15 @@ class PDFReaderApp(ctk.CTk):
 
     def _show_voice_help(self):
         messagebox.showinfo("Voice Help", 
-            "To use Siri or High-Quality voices in third-party apps on Sequoia:\n\n"
+            "To use Premium or Enhanced voices in third-party apps on macOS:\n\n"
             "1. Open System Settings\n"
             "2. Go to Accessibility > Spoken Content\n"
             "3. Click the 'i' next to 'System Voice'\n"
             "4. Go to 'Manage Voices...'\n"
-            "5. Find 'English (United States)' and search for Siri.\n"
-            "6. Click the Download icon (cloud) next to each voice.\n\n"
-            "Once downloaded, restart PDF Speaker!")
+            "5. Find your preferred language (e.g. English)\n"
+            "6. Download voices marked as (Enhanced).\n\n"
+            "Recommended: Samantha (Enhanced), Daniel (Enhanced).\n\n"
+            "Note: Actual 'Siri' voices are restricted by Apple to first-party apps only.")
         os.system("open 'x-apple.systempreferences:com.apple.preference.universalaccess?SpokenContent'")
 
     def _refresh_voice_list(self):
@@ -446,26 +443,19 @@ class PDFReaderApp(ctk.CTk):
         voice_map = {}
         for v in raw_voices:
             if v['id'] in self.hidden_voice_ids: continue
-            
-            # DEFAULT FILTER: Strictly hide novelty/creepy voices
             if v['is_novelty']: continue
             
-            # PREMIUM FILTER: If enabled, hide non-premium
             if premium_only and not v['is_premium']:
                 continue
             
-            # Key for deduplication: name + language
             key = (v['name'], v['lang'])
             
-            # PRIORITY: Keep Siri/Personal, then highest quality
             if key not in voice_map:
                 voice_map[key] = v
             else:
                 existing = voice_map[key]
-                # Priority weight: Personal (10) > Siri (5) > Quality (1-3)
                 def get_score(voice):
                     s = voice['quality_val']
-                    if voice['is_siri']: s += 10
                     if voice.get('is_personal'): s += 50
                     return s
                 
@@ -474,29 +464,24 @@ class PDFReaderApp(ctk.CTk):
         
         self.voices = list(voice_map.values())
         
-        # Fallback: if we filtered too aggressively and list is empty, turn off high quality filter
         if not self.voices and premium_only:
             self.premium_only_switch.deselect()
-            # Important: recursion fallback to show SOMETHING
             self.after(10, self._refresh_voice_list)
             return
         
-        # Sort: Personal Voice -> Siri -> Language -> Name
         self.voices.sort(key=lambda v: (
             not v.get('is_personal', False),
-            not v['is_siri'],
+            -v['quality_val'],
             not v['lang'].startswith("en"),
             v['name']
         ))
         
-        # Display name format: "Siri (en-US) ✨" or "My Voice (Personal) 👤"
         self.voice_display_names = []
         for v in self.voices:
             tag = ""
-            if v['is_siri']: tag = "✨"
-            elif v.get('is_personal'): tag = "👤"
-            elif v['quality_val'] == 3: tag = "💎" # Premium
-            elif v['quality_val'] == 2: tag = "★" # Enhanced
+            if v.get('is_personal'): tag = "👤"
+            elif v['quality_val'] == 3: tag = "💎" 
+            elif v['quality_val'] == 2: tag = "★" 
             
             self.voice_display_names.append(f"{v['name']} ({v['lang']}) {tag}")
 
@@ -510,11 +495,9 @@ class PDFReaderApp(ctk.CTk):
 
     def _add_bookmark(self):
         if not self.current_pdf_path: return
-        
-        # Simple input dialog for note
         dialog = ctk.CTkInputDialog(text="Enter a note for this bookmark:", title="Add Bookmark")
         note = dialog.get_input()
-        if note is None: return # Cancelled
+        if note is None: return 
         
         if self.current_pdf_path not in self.bookmarks:
             self.bookmarks[self.current_pdf_path] = []
@@ -536,7 +519,6 @@ class PDFReaderApp(ctk.CTk):
             label.pack(pady=20)
             return
             
-        # Sort bookmarks by page number
         bmks = sorted(self.bookmarks[self.current_pdf_path], key=lambda x: x['page'])
         
         for b in bmks:
@@ -575,7 +557,6 @@ class PDFReaderApp(ctk.CTk):
                     self._refresh_library_list()
                     
                     if config.get("last_pdf") and os.path.exists(config["last_pdf"]):
-                        # _load_pdf will use the page number from library state
                         self._load_pdf(config["last_pdf"])
             except: pass
 
