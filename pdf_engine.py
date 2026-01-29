@@ -116,32 +116,37 @@ class PDFEngine:
 
     def _clean_text(self, text: str) -> str:
         """Cleans up PDF artifacts and corrects font-mapping errors."""
-        # Replace ligatures
+        # Replace ligatures and specialized characters
         replacements = {
             "ﬀ": "ff", "ﬁ": "fi", "ﬂ": "fl", "ﬃ": "ffi", "ﬄ": "ffl",
-            "ﬅ": "st", "ﬆ": "st", "\u00ad": "",
+            "ﬅ": "st", "ﬆ": "st", "\u00ad": "", "\u2010": "-", "\u2011": "-",
+            "\u2012": "-", "\u2013": "-", "\u2014": "--", "\u2018": "'",
+            "\u2019": "'", "\u201c": '"', "\u201d": '"', "\u2026": "...",
         }
         for old, new in replacements.items():
             text = text.replace(old, new)
             
-        # Correct common font-mapping errors (e.g., from subset fonts)
-        # Note: We only replace standalone tokens to avoid corruption
+        # Remove end-of-line hyphenation (e.g. "com- puter" -> "computer")
+        # Note: We look for a hyphen followed by a space because multiple spans 
+        # were joined with spaces in get_page_data.
+        text = re.sub(r"(\w+)-\s+(\w+)", r"\1\2", text)
+
+        # Correct common font-mapping/OCR errors
         corrections = {
             r"\bclifferent\b": "different",
             r"\bcitYerent\b": "different",
-            r"\b1\b": "I", # Common when font maps I to 1
+            r"\btl1at\b": "that",
+            r"\btllat\b": "that",
+            r"\bvvith\b": "with",
+            r"\bl\b": "I", # Standalone lowercase L as capital I
         }
         
-        # Heuristic for the 'I as J' problem (very common in certain Serif fonts)
-        # If we see a 'J' where an 'I' would make more sense (e.g., single char 'J')
-        text = re.sub(r"\bJ\b", "I", text) 
+        # Heuristic for standalone 'J' or '1' as 'I'
+        text = re.sub(r"\b[J1]\b", "I", text) 
         
         for pattern, replacement in corrections.items():
             text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
 
-        # Remove hyphenation at end of line
-        text = re.sub(r"(\w+)-\n(\w+)", r"\1\2", text)
-        
         # Replace multiple spaces/newlines with single space
         text = re.sub(r"\s+", " ", text)
         
