@@ -132,6 +132,10 @@ class PDFReaderApp(ctk.CTk):
         self.manage_voices_btn = ctk.CTkButton(self.ctrl_tab, text="Reset Hidden Voices", height=25, font=ctk.CTkFont(size=10), fg_color="transparent", command=self._reset_hidden_voices)
         self.manage_voices_btn.pack(padx=10, pady=5)
 
+        self.premium_only_switch = ctk.CTkSwitch(self.ctrl_tab, text="High Quality Only", command=self._refresh_voice_list)
+        self.premium_only_switch.select() # Default to ON
+        self.premium_only_switch.pack(padx=10, pady=10)
+
         # --- TAB: BOOKMARKS ---
         self.bmk_tab = self.tabview.tab("Bookmarks")
         
@@ -453,9 +457,18 @@ class PDFReaderApp(ctk.CTk):
 
     def _refresh_voice_list(self):
         raw_voices = self.tts_engine.get_voices()
+        premium_only = self.premium_only_switch.get() == 1
+        
         voice_map = {}
         for v in raw_voices:
             if v['id'] in self.hidden_voice_ids: continue
+            
+            # DEFAULT FILTER: Always hide novelty/creepy voices
+            if v['is_novelty'] and not v['is_siri']: continue
+            
+            # PREMIUM FILTER: If enabled, hide non-premium
+            if premium_only and not (v['is_premium'] or v['is_siri'] or v['is_personal']):
+                continue
             
             # Key for deduplication: name + language
             key = (v['name'], v['lang'])
@@ -485,8 +498,13 @@ class PDFReaderApp(ctk.CTk):
         # Display name format: "Siri (en-US) ★" or "My Voice (Personal) ★"
         self.voice_display_names = []
         for v in self.voices:
-            tag = "★" if v['quality_val'] > 1 else ""
+            tag = ""
+            if v['quality_val'] == 3: tag = "💎" # Premium
+            elif v['quality_val'] == 2: tag = "★" # Enhanced
+            
             if v.get('is_personal'): tag = "👤"
+            elif v.get('is_siri'): tag = "✨" # Special tag for Siri
+            
             self.voice_display_names.append(f"{v['name']} ({v['lang']}) {tag}")
 
         if self.voice_menu:

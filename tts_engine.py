@@ -24,8 +24,12 @@ class TTSEngine:
         # Mapping for quality enums
         qualities = {1: "Standard", 2: "Enhanced", 3: "Premium"}
         
-        # DEBUG: Print all voice IDs to console to help track down Siri Voice 4
-        print(f"--- TOTAL VOICES FOUND: {len(voices)} ---")
+        # List of "Novelty" or "Creepy" voices that clutter the UI
+        novelty_names = {
+            "albert", "bad news", "bahh", "bells", "boing", "bubbles", "cellos", 
+            "deranged", "good news", "hysterical", "pipe organ", "trinket", 
+            "whisper", "zarvox", "organ"
+        }
         
         for v in voices:
             name = v.name()
@@ -34,13 +38,16 @@ class TTSEngine:
             quality_num = v.quality()
             quality = qualities.get(quality_num, "Standard")
             
-            # Print each one to help user find the internal name
-            print(f"ID: {v_id} | Name: {name} | Lang: {lang} | Quality: {quality}")
-            
-            # Siri/Personal voice detection
-            is_siri = "siri" in name.lower() or "siri" in v_id.lower()
+            # Siri detection logic: look for 'siri' or 'aaron' or 'nicky' or 'helena' etc
+            # Most modern Siri voices use the 'ttsvoice' prefix
+            is_siri = any(x in v_id.lower() for x in ["siri", "ttsvoice"]) or "siri" in name.lower()
             is_personal = "personalvoice" in v_id.lower() or "personal" in name.lower()
+            is_novelty = name.lower() in novelty_names or any(n in name.lower() for n in novelty_names)
             
+            # Highlight Premium/Neural voices
+            # Most Premium voices have 'premium' or 'neural' in ID
+            is_premium = quality_num >= 2 or any(x in v_id.lower() for x in ["premium", "neural", "enhanced"])
+
             results.append({
                 "id": v_id, 
                 "name": name, 
@@ -48,7 +55,9 @@ class TTSEngine:
                 "quality": quality,
                 "quality_val": quality_num,
                 "is_siri": is_siri,
-                "is_personal": is_personal
+                "is_personal": is_personal,
+                "is_novelty": is_novelty,
+                "is_premium": is_premium
             })
         return results
 
