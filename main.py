@@ -26,7 +26,7 @@ class AudileApp(ctk.CTk):
         # Initialize engines
         self.pdf_engine = None
         # Word callback uses .after to safely update UI from TTS thread (Avoids GIL crash)
-        self.tts_engine = TTSEngine(on_word_callback=lambda l, le: self.after(0, self._on_word_spoken, l, le))
+        self.tts_engine = TTSEngine()
         
         # State
         self.config_file = os.path.expanduser("~/.audile_config.json")
@@ -259,22 +259,33 @@ class AudileApp(ctk.CTk):
             self.canvas.config(scrollregion=(0, 0, max(canvas_width, img_w + x_off*2), img_h + 80))
             self.current_page_rendered = self.current_page_num
 
-    def _on_word_spoken(self, location, length):
-        """Callback for real-time word highlighting."""
-        if not self.is_playing or not self.current_page_blocks: return
-        if self.current_block_index >= len(self.current_page_blocks): return
+    def _animate_highlight(self, start_time, total_chars, words, rate_multiplier=1.0):
+        """Estimation-based karaoke highlighting loop (Safe for GIL)."""
+        if not self.is_playing: return
         
-        block = self.current_page_blocks[self.current_block_index]
-        # Text alignment for highlighting
-        total_chars = len(block["text"])
-        if total_chars == 0: return
+        # Check if TTS is still speaking (Wait for finish)
+        if not self.tts_engine.is_speaking():
+            # Speech finished (or almost), handled by _check_speech_status
+            return
+
+        elapsed = time.time() - start_time
+        # Estimation: Average speaking rate is ~15 chars/sec * rate
+        # Tuned constant: 14 chars/sec seems relatively natural for the default rate
+        chars_per_sec = 14.0 * self.speed_slider.get()
+        estimated_char_idx = int(elapsed * chars_per_sec)
         
-        progress = location / total_chars
-        word_idx = int(progress * len(block["words"]))
-        word_idx = max(0, min(word_idx, len(block["words"]) - 1))
+        if estimated_char_idx < total_chars:
+             # Find word at this estimated index
+            progress = estimated_char_idx / total_chars
+            word_idx = int(progress * len(words))
+            word_idx = max(0, min(word_idx, len(words) - 1))
+            
+            if word_idx < len(words):
+                 self._highlight_word(words[word_idx]["bbox"])
+            
+            # Loop
+            self.after(50, lambda: self._animate_highlight(start_time, total_chars, words, rate_multiplier))
         
-        if word_idx < len(block["words"]):
-            self._highlight_word(block["words"][word_idx]["bbox"])
 
     def _highlight_word(self, bbox):
         self.canvas.delete("word_highlight")
@@ -308,6 +319,9 @@ class AudileApp(ctk.CTk):
             # Smart Year Fix (1975 -> nineteen seventy five)
             text_to_speak = self._fix_years(block["text"])
             self.tts_engine.speak(text_to_speak)
+            
+            # Start Safe Highlight Loop
+            self.after(50, lambda: self._animate_highlight(time.time(), len(block["text"]), block["words"]))
             self.after(100, self._check_speech_status)
         else:
             self._on_page_finished()

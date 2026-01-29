@@ -11,27 +11,9 @@ import re
 import objc
 from typing import List, Dict, Callable
 
-class TTSDelegate(NSObject):
-    def initWithCallback_(self, callback: Callable):
-        self = objc.super(TTSDelegate, self).init()
-        if self:
-            self._callback = callback
-        return self
-
-    def speechSynthesizer_willSpeakRangeOfSpeechString_utterance_(self, synth, char_range, utterance):
-        # Notify the main thread via callback
-        if self._callback:
-            self._callback(char_range.location, char_range.length)
-
 class TTSEngine:
-    def __init__(self, on_word_callback=None):
+    def __init__(self):
         self._synth = AVSpeechSynthesizer.alloc().init()
-        
-        # Word-level callback setup (Disabled due to GIL crash in compiled app)
-        # if on_word_callback:
-        #     self._delegate = TTSDelegate.alloc().initWithCallback_(on_word_callback)
-        #     self._synth.setDelegate_(self._delegate)
-        
         self._voice = None
         self._rate = 0.5 
         self._volume = 1.0

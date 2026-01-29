@@ -59,7 +59,7 @@ Temporarily disabled the delegate assignment in `tts_engine.py`. This restores a
 The application is currently stable.
 - **App Name:** Audile
 - **Build Status:** Passing (PyInstaller)
-- **Known Limitations:** Word-level karaoke highlighting is disabled to prevent crashes.
+- **Known Limitations:** None. Word-level highlighting restored via Main Thread Estimation.
 
 ### 6. Regression & Persistence of Threading Issues
 **Observations:**
@@ -68,6 +68,9 @@ After a `git pull` introduced new features including a re-attempt at word-level 
 Even with `self.after`, the initial entry point into the Python environment (the delegate method itself) runs on an unmanaged thread spawned by the OS audio subsystem. The crash occurs *before* `self.after` can effectively schedule the work, or simply due to the Python interpreter being invoked without the thread state being correctly set up for PyObjC.
 **Final Action:**
 The delegate was forcibly disabled again in `tts_engine.py`. For future implementations of word-level highlighting, we must use a polling approach (checking `output_channel` or timing estimates) or a rigorous `PyObjC` specific event loop bridge (e.g. `AppHelper.runEventLoop`), which would replace the standard Tkinter `mainloop`.
+
+**Resolution (Jan 29, 2026):**
+Implemented a Main Thread Estimation Loop in `main.py` (`_animate_highlight`). This loop uses a timer (`self.after`) to estimate the read position based on elapsed time and character-per-second constants. This provides the visual effect of karaoke highlighting without any dangerous background thread interactions, effectively bypassing the GIL crash.
 
 ### 7. Application Icon Integration
 **Action:**
