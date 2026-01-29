@@ -441,13 +441,15 @@ class PDFReaderApp(ctk.CTk):
 
     def _show_voice_help(self):
         messagebox.showinfo("Voice Help", 
-            "To use Siri or High-Quality voices in third-party apps:\n\n"
+            "To use Siri or High-Quality voices in third-party apps on Sequoia:\n\n"
             "1. Open System Settings\n"
             "2. Go to Accessibility > Spoken Content\n"
             "3. Click the 'i' next to 'System Voice'\n"
-            "4. Search for your preferred voice (e.g. 'Siri')\n"
-            "5. Click the Download icon (cloud) to install the high-quality version.\n\n"
-            "Once downloaded, restart PDF Speaker to see the new voices!")
+            "4. Go to 'Manage Voices...'\n"
+            "5. Find 'English (United States)' and search for Siri.\n"
+            "6. Click the Download icon (cloud) next to each voice.\n\n"
+            "IMPORTANT: Downloading them for 'Siri' the assistant is NOT enough. They must be downloaded here for 'Spoken Content'.\n\n"
+            "Once downloaded, restart PDF Speaker!")
 
     def _refresh_voice_list(self):
         raw_voices = self.tts_engine.get_voices()
@@ -483,6 +485,13 @@ class PDFReaderApp(ctk.CTk):
                     voice_map[key] = v
         
         self.voices = list(voice_map.values())
+        
+        # Fallback: if we filtered too aggressively and list is empty, turn off high quality filter
+        if not self.voices and premium_only:
+            self.premium_only_switch.deselect()
+            # Important: recursion fallback to show SOMETHING
+            self.after(10, self._refresh_voice_list)
+            return
         
         # Sort: Personal Voice -> Siri -> Language -> Name
         self.voices.sort(key=lambda v: (

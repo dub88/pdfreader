@@ -29,10 +29,32 @@ class TTSEngine:
         creepy_keywords = {
             "albert", "badnews", "bahh", "bells", "boing", "bubbles", "cellos", 
             "deranged", "goodnews", "hysterical", "junior", "organ", "princess", 
-            "ralph", "trinoids", "whisper", "zarvox", "eloquence", "jester", "wobble"
+            "ralph", "trinoids", "whisper", "zarvox", "eloquence", "jester", "wobble", "superstar"
         }
         
-        # ... logging logic ...
+        # LOGGING: Detailed log to Desktop (Sorted so good stuff is at the TOP)
+        import subprocess
+        log_path = os.path.expanduser("~/Desktop/pdf_speaker_voice_debug.txt")
+        try:
+            # Sort voices for the log: Siri/Premium first
+            sorted_for_log = sorted(voices, key=lambda v: (
+                "siri" not in v.identifier().lower() and "ttsvoice" not in v.identifier().lower(),
+                v.quality() < 2,
+                v.name()
+            ))
+            
+            say_output = subprocess.check_output(["say", "-v", "?"], text=True)
+            with open(log_path, "w") as f:
+                f.write("PDF Speaker Voice Debug Log\n")
+                f.write(f"Total Voices Detected by API: {len(voices)}\n")
+                f.write("-" * 50 + "\n")
+                f.write("TOP 30 DETECTED VOICES (PRIORITY LIST):\n")
+                for v in sorted_for_log[:30]:
+                    f.write(f"Name: {v.name()} | ID: {v.identifier()} | Lang: {v.language()} | Quality: {v.quality()}\n")
+                f.write("\n" + "-" * 50 + "\n")
+                f.write("SYSTEM 'SAY' COMMAND VOICES:\n")
+                f.write(say_output)
+        except: pass
 
         for v in voices:
             name = v.name()
@@ -48,14 +70,12 @@ class TTSEngine:
             is_novelty = any(x in v_id for x in creepy_keywords) or any(x in name.lower() for x in ["bad news", "good news", "pipe organ", "jester", "wobble", "superstar"])
             
             # High-Quality detection
-            # 'compact' is the low-quality mobile version. Anything else is better.
+            # CRITICAL FIX: If quality is 1 but it's not a 'compact' or 'creepy' voice, 
+            # we treat it as premium to avoid an empty list on Sequoia.
+            is_compact = "compact" in v_id
             is_premium = (quality_num >= 2 or 
-                         any(x in v_id for x in ["premium", "enhanced", "siri", "ttsvoice"]) or
-                         is_personal)
-            
-            # Specifically check for 'compact' to downgrade
-            if "compact" in v_id and not (is_siri or is_personal):
-                is_premium = False
+                         is_siri or is_personal or 
+                         (not is_compact and not is_novelty))
 
             results.append({
                 "id": v.identifier(), 
@@ -87,7 +107,6 @@ class TTSEngine:
         self._voice = AVSpeechSynthesisVoice.voiceWithIdentifier_(voice_id)
 
     def set_rate(self, rate: float):
-
         """
         AVFoundation rate scale is different. 
         0.5 is normal speed. 0.0 is very slow, 1.0 is very fast.
