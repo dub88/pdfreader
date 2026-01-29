@@ -24,6 +24,9 @@ class TTSEngine:
         # Mapping for quality enums
         qualities = {1: "Standard", 2: "Enhanced", 3: "Premium"}
         
+        # DEBUG: Print all voice IDs to console to help track down Siri Voice 4
+        print(f"--- TOTAL VOICES FOUND: {len(voices)} ---")
+        
         for v in voices:
             name = v.name()
             v_id = v.identifier()
@@ -31,8 +34,12 @@ class TTSEngine:
             quality_num = v.quality()
             quality = qualities.get(quality_num, "Standard")
             
-            # Siri detection logic: name or ID
+            # Print each one to help user find the internal name
+            print(f"ID: {v_id} | Name: {name} | Lang: {lang} | Quality: {quality}")
+            
+            # Siri/Personal voice detection
             is_siri = "siri" in name.lower() or "siri" in v_id.lower()
+            is_personal = "personalvoice" in v_id.lower() or "personal" in name.lower()
             
             results.append({
                 "id": v_id, 
@@ -40,7 +47,8 @@ class TTSEngine:
                 "lang": lang, 
                 "quality": quality,
                 "quality_val": quality_num,
-                "is_siri": is_siri
+                "is_siri": is_siri,
+                "is_personal": is_personal
             })
         return results
 

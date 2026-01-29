@@ -457,22 +457,41 @@ class PDFReaderApp(ctk.CTk):
         for v in raw_voices:
             if v['id'] in self.hidden_voice_ids: continue
             
+            # Key for deduplication: name + language
             key = (v['name'], v['lang'])
-            if key not in voice_map or v['quality_val'] > voice_map[key]['quality_val']:
+            
+            # PRIORITY: Keep Siri, then highest quality
+            if key not in voice_map:
                 voice_map[key] = v
+            else:
+                # If existing isn't Siri but new one is, swap
+                if not voice_map[key]['is_siri'] and v['is_siri']:
+                    voice_map[key] = v
+                # If both are same Siri-status, keep higher quality
+                elif voice_map[key]['is_siri'] == v['is_siri']:
+                    if v['quality_val'] > voice_map[key]['quality_val']:
+                        voice_map[key] = v
         
         self.voices = list(voice_map.values())
+        
+        # Sort: Personal Voice -> Siri -> Language -> Name
         self.voices.sort(key=lambda v: (
+            not v.get('is_personal', False),
             not v['is_siri'],
             not v['lang'].startswith("en"),
             v['name']
         ))
         
-        self.voice_display_names = [f"{v['name']} ({v['lang']}) {'★' if v['quality_val'] > 1 else ''}" for v in self.voices]
+        # Display name format: "Siri (en-US) ★" or "My Voice (Personal) ★"
+        self.voice_display_names = []
+        for v in self.voices:
+            tag = "★" if v['quality_val'] > 1 else ""
+            if v.get('is_personal'): tag = "👤"
+            self.voice_display_names.append(f"{v['name']} ({v['lang']}) {tag}")
+
         if self.voice_menu:
             self.voice_menu.configure(values=self.voice_display_names)
             if self.voice_display_names:
-                # Try to keep current or set to first Siri
                 current = self.voice_menu.get()
                 if current not in self.voice_display_names:
                     self.voice_menu.set(self.voice_display_names[0])
