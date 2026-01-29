@@ -67,7 +67,7 @@ class AudionApp(ctk.CTk):
         self.logo_label.pack(padx=20, pady=(40, 20))
 
         self.tabview = ctk.CTkTabview(self.sidebar, width=250, 
-                                      segmented_button_fg_color="transparent",
+                                      segmented_button_fg_color=None,
                                       segmented_button_selected_color=("#FA2D48", "#FA2D48"),
                                       segmented_button_selected_hover_color=("#D41C33", "#D41C33"),
                                       segmented_button_unselected_color=("#8E8E93", "#8E8E93"))
@@ -180,7 +180,8 @@ class AudionApp(ctk.CTk):
         self.canvas_frame.grid_columnconfigure(0, weight=1)
         self.canvas_frame.grid_rowconfigure(0, weight=1)
 
-        self.canvas = tk.Canvas(self.canvas_frame, bg=("#F2F2F7", "#1E1E1E"), highlightthickness=0)
+        bg_color = "#1E1E1E" if darkdetect.isDark() else "#F2F2F7"
+        self.canvas = tk.Canvas(self.canvas_frame, bg=bg_color, highlightthickness=0)
         self.canvas.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         
         self.v_scrollbar = ctk.CTkScrollbar(self.canvas_frame, orientation="vertical", command=self.canvas.yview)
