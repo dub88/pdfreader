@@ -175,32 +175,6 @@ class PDFReaderApp(ctk.CTk):
         # Build initial voice list
         self._refresh_voice_list()
 
-        self.content_frame = ctk.CTkFrame(self, corner_radius=10)
-        self.content_frame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
-        self.content_frame.grid_columnconfigure(0, weight=1)
-        self.content_frame.grid_rowconfigure(0, weight=1)
-
-        self.canvas_frame = ctk.CTkFrame(self.content_frame)
-        self.canvas_frame.grid(row=0, column=0, sticky="nsew")
-        self.canvas_frame.grid_columnconfigure(0, weight=1)
-        self.canvas_frame.grid_rowconfigure(0, weight=1)
-
-        self.canvas = tk.Canvas(self.canvas_frame, bg="#2b2b2b", highlightthickness=0)
-        self.canvas.grid(row=0, column=0, sticky="nsew")
-        
-        self.v_scrollbar = ctk.CTkScrollbar(self.canvas_frame, orientation="vertical", command=self.canvas.yview)
-        self.v_scrollbar.grid(row=0, column=1, sticky="ns")
-        self.h_scrollbar = ctk.CTkScrollbar(self.canvas_frame, orientation="horizontal", command=self.canvas.xview)
-        self.h_scrollbar.grid(row=1, column=0, sticky="ew")
-        self.canvas.configure(yscrollcommand=self.v_scrollbar.set, xscrollcommand=self.h_scrollbar.set)
-
-        self.progress_bar = ctk.CTkProgressBar(self.content_frame)
-        self.progress_bar.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="ew")
-        self.progress_bar.set(0)
-
-        self.status_label = ctk.CTkLabel(self, text="Ready", anchor="w")
-        self.status_label.grid(row=1, column=0, columnspan=2, padx=20, pady=5, sticky="ew")
-
     def _open_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("PDF Files", "*.pdf")])
         if file_path:
@@ -391,16 +365,21 @@ class PDFReaderApp(ctk.CTk):
         self.tts_engine.set_rate(v)
 
     def _on_voice_change(self, display_name):
-        idx = self.voice_display_names.index(display_name)
-        voice = self.voices[idx]
-        self.tts_engine.set_voice(voice['id'])
+        # Look up by display name
+        for i, dn in enumerate(self.voice_display_names):
+            if dn == display_name:
+                voice = self.voices[i]
+                self.tts_engine.set_voice(voice['id'])
+                break
 
     def _preview_voice(self):
         current_voice_display = self.voice_menu.get()
         if not current_voice_display: return
-        idx = self.voice_display_names.index(current_voice_display)
-        voice = self.voices[idx]
-        self.tts_engine.preview(voice['id'])
+        for i, dn in enumerate(self.voice_display_names):
+            if dn == current_voice_display:
+                voice = self.voices[i]
+                self.tts_engine.preview(voice['id'])
+                break
 
     def _refresh_library_list(self):
         for widget in self.lib_scroll.winfo_children():
@@ -444,9 +423,11 @@ class PDFReaderApp(ctk.CTk):
     def _hide_current_voice(self):
         current_voice_display = self.voice_menu.get()
         if not current_voice_display: return
-        idx = self.voice_display_names.index(current_voice_display)
-        voice = self.voices[idx]
-        self.hidden_voice_ids.add(voice['id'])
+        for i, dn in enumerate(self.voice_display_names):
+            if dn == current_voice_display:
+                voice = self.voices[i]
+                self.hidden_voice_ids.add(voice['id'])
+                break
         self._refresh_voice_list()
         self._save_config()
 
@@ -495,7 +476,7 @@ class PDFReaderApp(ctk.CTk):
             v['name']
         ))
         
-        # Display name format: "Siri (en-US) ★" or "My Voice (Personal) ★"
+        # Display name format: "Siri (en-US) ✨" or "My Voice (Personal) 👤"
         self.voice_display_names = []
         for v in self.voices:
             tag = ""
