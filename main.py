@@ -81,7 +81,7 @@ class PDFReaderApp(ctk.CTk):
         self.logo_label.pack(padx=20, pady=(40, 20))
 
         self.tabview = ctk.CTkTabview(self.sidebar, width=260, 
-                                      segmented_button_fg_color=("transparent"),
+                                      segmented_button_fg_color=None,
                                       segmented_button_selected_color=("#007AFF", "#0A84FF"),
                                       segmented_button_selected_hover_color=("#0051A8", "#0064D2"))
         self.tabview.pack(padx=15, pady=10, expand=True, fill="both")
@@ -135,7 +135,7 @@ class PDFReaderApp(ctk.CTk):
         self.prev_page_btn = ctk.CTkButton(self.nav_frame, text="←", width=45, height=35, corner_radius=8, command=self._prev_page)
         self.prev_page_btn.pack(side="left", padx=(0, 5))
         
-        self.page_info_label = ctk.CTkLabel(self.nav_frame, text="Page 0 / 0", font=ctk.CTkFont(size=13, weight="semibold"))
+        self.page_info_label = ctk.CTkLabel(self.nav_frame, text="Page 0 / 0", font=ctk.CTkFont(size=13, weight="bold"))
         self.page_info_label.pack(side="left", expand=True)
 
         self.next_page_btn = ctk.CTkButton(self.nav_frame, text="→", width=45, height=35, corner_radius=8, command=self._next_page)
@@ -439,7 +439,7 @@ class PDFReaderApp(ctk.CTk):
             btn = ctk.CTkButton(frame, text=f"{info['title']}\nPage {info['page']}", 
                                anchor="w", height=60, corner_radius=12,
                                fg_color=btn_color, text_color=txt_color,
-                               font=ctk.CTkFont(size=12, weight="semibold"),
+                               font=ctk.CTkFont(size=12, weight="bold"),
                                command=lambda p=path: self._load_pdf(p))
             btn.pack(side="left", fill="x", expand=True, padx=(0, 5))
             
