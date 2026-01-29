@@ -5,6 +5,7 @@ from AVFoundation import (
     AVSpeechBoundaryImmediate
 )
 import time
+import os
 from typing import List, Dict
 
 class TTSEngine:
