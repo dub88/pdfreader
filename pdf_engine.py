@@ -89,6 +89,7 @@ class PDFEngine:
                         "bbox": list(line["bbox"]),
                         "words": line_words
                     })
+        print(f"[DEBUG Engine] Extracted {len(final_lines)} lines for page.")
 
         # Filter headers/footers based on margin
         result = []

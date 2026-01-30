@@ -181,7 +181,7 @@ class AudileApp(ctk.CTk):
         self.progress_bar.grid(row=1, column=0, padx=30, pady=(0, 25), sticky="ew")
         self.progress_bar.set(0)
 
-        self.status_label = ctk.CTkLabel(self, text="Audile v1.1 Refined Line Focus", anchor="w", font=ctk.CTkFont(size=11), text_color="#8E8E93")
+        self.status_label = ctk.CTkLabel(self, text="Audile v1.2 Side-Only Focus", anchor="w", font=ctk.CTkFont(size=11), text_color="#8E8E93")
         self.status_label.grid(row=1, column=1, padx=30, pady=(0, 10), sticky="ew")
 
     def _open_file(self):
@@ -276,6 +276,7 @@ class AudileApp(ctk.CTk):
         if not coords: return
         x_off, y_off = coords[0], coords[1]
         
+        print(f"[DEBUG v1.2] Highlighting: {block['text'][:50]}...")
         # --- SIDEBAR INDICATOR (Apple Music Lyric Style) ---
         # Draw a sleek vertical indicator to the left of the active line
         self.canvas.create_rectangle(x_off - 16, bbox[1]*z + y_off + 2, 
