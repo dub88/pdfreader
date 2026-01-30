@@ -114,11 +114,11 @@ class AudileApp(ctk.CTk):
         # Page Info & Navigation
         self.nav_frame = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
         self.nav_frame.pack(padx=10, pady=10, fill="x")
-        self.prev_page_btn = ctk.CTkButton(self.nav_frame, text="⏪", width=50, height=40, corner_radius=10, fg_color="transparent", border_width=1, command=self._prev_page)
+        self.prev_page_btn = ctk.CTkButton(self.nav_frame, text="⏪", width=50, height=40, corner_radius=10, fg_color="transparent", border_width=1, text_color=("black", "white"), command=self._prev_page)
         self.prev_page_btn.pack(side="left", padx=(0, 5))
         self.page_info_label = ctk.CTkLabel(self.nav_frame, text="0 / 0", font=ctk.CTkFont(size=14, weight="bold"))
         self.page_info_label.pack(side="left", expand=True)
-        self.next_page_btn = ctk.CTkButton(self.nav_frame, text="⏩", width=50, height=40, corner_radius=10, fg_color="transparent", border_width=1, command=self._next_page)
+        self.next_page_btn = ctk.CTkButton(self.nav_frame, text="⏩", width=50, height=40, corner_radius=10, fg_color="transparent", border_width=1, text_color=("black", "white"), command=self._next_page)
         self.next_page_btn.pack(side="left", padx=(5, 0))
 
         # Speed Selector
@@ -138,9 +138,9 @@ class AudileApp(ctk.CTk):
         
         self.voice_utils = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
         self.voice_utils.pack(padx=10, pady=5, fill="x")
-        self.preview_btn = ctk.CTkButton(self.voice_utils, text="🔊 Preview", width=80, height=30, fg_color="transparent", border_width=1, command=self._preview_voice)
+        self.preview_btn = ctk.CTkButton(self.voice_utils, text="🔊 Preview", width=80, height=30, fg_color="transparent", border_width=1, text_color=("black", "white"), command=self._preview_voice)
         self.preview_btn.pack(side="left", padx=(0, 2), expand=True, fill="x")
-        self.hide_voice_btn = ctk.CTkButton(self.voice_utils, text="👁 Hide", width=80, height=30, fg_color="transparent", border_width=1, command=self._hide_current_voice)
+        self.hide_voice_btn = ctk.CTkButton(self.voice_utils, text="👁 Hide", width=80, height=30, fg_color="transparent", border_width=1, text_color=("black", "white"), command=self._hide_current_voice)
         self.hide_voice_btn.pack(side="left", padx=(2, 0), expand=True, fill="x")
 
         self.premium_only_switch = ctk.CTkSwitch(self.ctrl_tab, text="High Quality Only", progress_color=self.ACCENT_PINK, command=self._refresh_voice_list)
@@ -150,9 +150,9 @@ class AudileApp(ctk.CTk):
         # Help / Reset at bottom
         self.help_frame = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
         self.help_frame.pack(side="bottom", pady=10)
-        self.download_help_btn = ctk.CTkButton(self.help_frame, text="❓ Missing Voices?", height=20, font=ctk.CTkFont(size=10), fg_color="transparent", command=self._show_voice_help)
+        self.download_help_btn = ctk.CTkButton(self.help_frame, text="❓ Missing Voices?", height=20, font=ctk.CTkFont(size=10), fg_color="transparent", text_color=("black", "gray50"), command=self._show_voice_help)
         self.download_help_btn.pack()
-        self.reset_voices_btn = ctk.CTkButton(self.help_frame, text="↺ Reset Hidden Voices", height=20, font=ctk.CTkFont(size=10), fg_color="transparent", command=self._reset_hidden_voices)
+        self.reset_voices_btn = ctk.CTkButton(self.help_frame, text="↺ Reset Hidden Voices", height=20, font=ctk.CTkFont(size=10), fg_color="transparent", text_color=("black", "gray50"), command=self._reset_hidden_voices)
         self.reset_voices_btn.pack()
 
         # --- TAB: NOTES ---
@@ -177,6 +177,15 @@ class AudileApp(ctk.CTk):
         self.canvas = tk.Canvas(self.canvas_frame, bg=self.canvas_bg, highlightthickness=0)
         self.canvas.grid(row=0, column=0, sticky="nsew", padx=15, pady=15)
         
+        # Bind MouseWheel for scrolling
+        self.canvas.bind("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind("<Button-4>", self._on_mousewheel) # Linux scroll up
+        self.canvas.bind("<Button-5>", self._on_mousewheel) # Linux scroll down
+        
+        # Bind pinch-to-zoom (macOS trackpad often maps to Control+MouseWheel)
+        self.canvas.bind("<Control-MouseWheel>", self._on_pinch_zoom)
+        self.canvas.bind("<Option-MouseWheel>", self._on_pinch_zoom)
+
         self.v_scrollbar = ctk.CTkScrollbar(self.canvas_frame, orientation="vertical", command=self.canvas.yview)
         self.v_scrollbar.grid(row=0, column=1, sticky="ns", pady=15)
         self.h_scrollbar = ctk.CTkScrollbar(self.canvas_frame, orientation="horizontal", command=self.canvas.xview)
@@ -188,6 +197,22 @@ class AudileApp(ctk.CTk):
         self.progress_bar.set(0)
 
         # Status label moved to sidebar under logo
+
+    def _on_mousewheel(self, event):
+        """Standard scroll for mouse and trackpad."""
+        if event.num == 4 or event.delta > 0:
+            self.canvas.yview_scroll(-1, "units")
+        elif event.num == 5 or event.delta < 0:
+            self.canvas.yview_scroll(1, "units")
+
+    def _on_pinch_zoom(self, event):
+        """Approximate zoom for macOS trackpad pinch."""
+        if event.delta > 0:
+            self.zoom_factor *= 1.1
+        else:
+            self.zoom_factor *= 0.9
+        self.zoom_factor = max(0.5, min(5.0, self.zoom_factor))
+        self._render_page(force=True)
 
     def _open_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("PDF Files", "*.pdf")])
@@ -467,7 +492,20 @@ class AudileApp(ctk.CTk):
                                text_color="white" if is_active else ("black", "white"),
                                command=lambda p=path: self._load_pdf(p, info.get('doc_type', 'Book')))
             btn.pack(side="left", fill="x", expand=True, padx=(0, 5))
-            ctk.CTkButton(frame, text="×", width=35, height=70, corner_radius=15, command=lambda p=path: self._remove_from_library(p)).pack(side="right")
+            
+            # Trash / Delete Button
+            del_btn = ctk.CTkButton(frame, text="🗑", width=35, height=70, corner_radius=15,
+                                   fg_color="transparent", border_width=1, border_color="#FA2D48",
+                                   text_color="#FA2D48", hover_color=("#FA2D48", "#450A0A"),
+                                   command=lambda p=path: self._confirm_remove_from_library(p))
+            del_btn.pack(side="right")
+
+    def _confirm_remove_from_library(self, path):
+        """Warning before deletion to prevent data loss."""
+        title = self.library[path]['title']
+        msg = f"Are you sure you want to remove '{title}' from your library?\n\nYou will lose all bookmarks and notes for this document."
+        if messagebox.askyesno("Remove Document", msg):
+            self._remove_from_library(path)
 
     def _remove_from_library(self, path):
         if path in self.library:
