@@ -53,6 +53,7 @@ class AudileApp(ctk.CTk):
         self.is_loading = False
         self.current_page_rendered = -1
         self.zoom_factor = 1.0
+        self.manual_zoom = False  # Track if user has manually zoomed
         self.current_tk_img = None
         
         # Persistence State
@@ -199,10 +200,16 @@ class AudileApp(ctk.CTk):
         self.canvas = tk.Canvas(self.main_container, bg=canvas_bg, highlightthickness=0)
         self.canvas.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
         
-        # Interactions for Canvas
+        # Interactions for Canvas - macOS trackpad scroll requires global bindings
         self.canvas.bind("<MouseWheel>", self._on_mousewheel)
         self.canvas.bind("<Control-MouseWheel>", self._on_pinch_zoom)
         self.canvas.bind("<Button-1>", self._on_canvas_click)  # Click to start at paragraph
+        # macOS two-finger scroll
+        self.bind_all("<MouseWheel>", self._on_mousewheel)
+        # Arrow key scrolling
+        self.canvas.bind("<Up>", lambda e: self.canvas.yview_scroll(-3, "units"))
+        self.canvas.bind("<Down>", lambda e: self.canvas.yview_scroll(3, "units"))
+        self.canvas.focus_set()
 
         # --- THE "DYNAMIC ISLAND" PLAYBACK POD ---
         self.island = ctk.CTkFrame(self.main_container, height=80, corner_radius=40, 
@@ -319,7 +326,7 @@ class AudileApp(ctk.CTk):
         if not self.pdf_engine: return
         self.update_idletasks()
         canvas_width = self.canvas.winfo_width()
-        if canvas_width > 50:
+        if canvas_width > 50 and not self.manual_zoom:
             orig_w, _ = self.pdf_engine.get_page_size(self.current_page_num)
             if orig_w: self.zoom_factor = (canvas_width - 100) / orig_w
         
@@ -416,11 +423,14 @@ class AudileApp(ctk.CTk):
         self._load_page_data(self.current_page_num)
 
     def _on_mousewheel(self, event):
-        """Native macOS trackpad scroll support (two-finger drag)."""
-        if event.num == 4 or event.delta > 0:
+        """macOS trackpad and mouse wheel scroll."""
+        # macOS uses delta values; positive = scroll up, negative = scroll down
+        # The delta can be large (120 on Windows) or small (1-5 on macOS trackpad)
+        if event.delta > 0:
             self.canvas.yview_scroll(-1, "units")
-        elif event.num == 5 or event.delta < 0:
+        elif event.delta < 0:
             self.canvas.yview_scroll(1, "units")
+        return "break"  # Prevent event propagation
 
     def _on_pinch_zoom(self, event):
         """Pinch-to-zoom using Control+MouseWheel."""
@@ -428,13 +438,16 @@ class AudileApp(ctk.CTk):
             self._zoom_in()
         else:
             self._zoom_out()
+        return "break"
     
     def _zoom_in(self):
-        self.zoom_factor = min(5.0, self.zoom_factor * 1.15)
+        self.manual_zoom = True  # User is manually zooming
+        self.zoom_factor = min(5.0, self.zoom_factor * 1.2)
         self._render_page(force=True)
     
     def _zoom_out(self):
-        self.zoom_factor = max(0.5, self.zoom_factor * 0.85)
+        self.manual_zoom = True  # User is manually zooming
+        self.zoom_factor = max(0.3, self.zoom_factor * 0.8)
         self._render_page(force=True)
     
     def _on_canvas_click(self, event):
