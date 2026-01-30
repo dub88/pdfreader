@@ -68,11 +68,13 @@ class AudileApp(ctk.CTk):
         
         self.logo_label = ctk.CTkLabel(self.sidebar, text="Audile", text_color=self.ACCENT_PINK,
                                        font=ctk.CTkFont(family="SF Pro Display", size=36, weight="bold"))
-        self.logo_label.pack(padx=20, pady=(40, 0))
-        
-        self.version_label = ctk.CTkLabel(self.sidebar, text="Version 2.1 - ACTIVE SYNC", 
+        self.version_label = ctk.CTkLabel(self.sidebar, text="Version 2.2 - DIAGNOSTIC", 
                                         font=ctk.CTkFont(size=12, weight="bold"), text_color=self.ACCENT_PINK)
         self.version_label.pack(padx=20, pady=(0, 10))
+        
+        # Diagnostic Log
+        self.debug_log = "/tmp/audile_debug.log"
+        with open(self.debug_log, "w") as f: f.write("Audile Debug Log Started\n")
 
         self.tabview = ctk.CTkTabview(self.sidebar, width=250, 
                                       segmented_button_selected_color=self.ACCENT_PINK,
@@ -267,30 +269,34 @@ class AudileApp(ctk.CTk):
             self.canvas.config(scrollregion=(0, 0, max(canvas_width, img_w + x_off*2), img_h + 80))
             self.current_page_rendered = self.current_page_num
 
+    def _log(self, msg):
+        try:
+            with open(self.debug_log, "a") as f: f.write(f"{time.strftime('%H:%M:%S')} - {msg}\n")
+        except: pass
+
     def _poll_tts_queue(self):
         """Pick up real-time speech coordinates from the queue and highlight accordingly."""
-        if not self.is_playing: 
-            self._polling_active = False
-            return
+        if not self.is_playing: return
             
-        # Clear queue and take latest
         location, length = None, None
         try:
-            while True:
+            while not self.tts_engine.queue.empty():
                 loc, l = self.tts_engine.queue.get_nowait()
                 location, length = loc, l
-        except queue.Empty:
-            pass
+        except: pass
 
         if location is not None:
+            self._log(f"Sync Packet: {location}")
             self._highlight_speech_range(location, length)
         elif self.tts_engine.is_speaking():
-            # VISUAL FALLBACK: If sync packets are delayed, show first line
-            # so the user knows focusing is working.
+            # Fallback for when sync data is missing
             if not self.canvas.find_withtag("highlight"):
+                self._log("Fallback: Highlight First Line")
                 self._highlight_speech_range(0, 1)
+        else:
+            self._log("Engine Not Speaking")
             
-        self.after(20, self._poll_tts_queue)
+        self.after(50, self._poll_tts_queue)
 
     def _highlight_speech_range(self, location, length):
         """Map a character range to a specific line and highlight it."""
