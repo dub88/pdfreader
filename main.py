@@ -206,7 +206,7 @@ class AudileApp(ctk.CTk):
         self.next_btn.pack(side="right", padx=(5, 13))
 
         # Overall Progress Bar (Hidden Slim line at the very top of main frame)
-        self.progress_bar = ctk.CTkProgressBar(self.main_container, height=3, progress_color=self.CLR_ACCENT, fg_color="transparent")
+        self.progress_bar = ctk.CTkProgressBar(self.main_container, height=3, progress_color=self.CLR_ACCENT, fg_color=("#E5E5EA", "#3A3A3C"))
         self.progress_bar.grid(row=0, column=0, sticky="new", padx=40, pady=(15, 0))
         self.progress_bar.set(0)
 
