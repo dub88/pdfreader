@@ -276,15 +276,10 @@ class AudileApp(ctk.CTk):
         if not coords: return
         x_off, y_off = coords[0], coords[1]
         
-        # --- SIDEBAR INDICATOR (Apple Music Style) ---
-        # Draw a thin vertical rectangle to the left of the page content
-        self.canvas.create_rectangle(x_off - 12, bbox[1]*z + y_off, 
-                                   x_off - 6, bbox[3]*z + y_off, 
-                                   fill=self.ACCENT_PINK, outline="", tags="highlight")
-        
-        # --- BLOCK UNDERLINE (Subtle Focus) ---
-        self.canvas.create_rectangle(bbox[0]*z + x_off, bbox[3]*z + y_off - 1, 
-                                   bbox[2]*z + x_off, bbox[3]*z + y_off + 1, 
+        # --- SIDEBAR INDICATOR (Apple Music Lyric Style) ---
+        # Draw a sleek vertical indicator to the left of the active line
+        self.canvas.create_rectangle(x_off - 16, bbox[1]*z + y_off + 2, 
+                                   x_off - 10, bbox[3]*z + y_off - 2, 
                                    fill=self.ACCENT_PINK, outline="", tags="highlight")
                                    
         self._scroll_to_highlight(bbox[1]*z + y_off, bbox[3]*z + y_off)
