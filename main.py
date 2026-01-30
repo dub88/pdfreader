@@ -202,6 +202,7 @@ class AudileApp(ctk.CTk):
         # Interactions for Canvas
         self.canvas.bind("<MouseWheel>", self._on_mousewheel)
         self.canvas.bind("<Control-MouseWheel>", self._on_pinch_zoom)
+        self.canvas.bind("<Button-1>", self._on_canvas_click)  # Click to start at paragraph
 
         # --- THE "DYNAMIC ISLAND" PLAYBACK POD ---
         self.island = ctk.CTkFrame(self.main_container, height=80, corner_radius=40, 
@@ -215,6 +216,16 @@ class AudileApp(ctk.CTk):
 
         self.page_lbl = ctk.CTkLabel(self.island, text="Audile Pro", font=ctk.CTkFont(family="SF Pro Display", size=15, weight="bold"))
         self.page_lbl.pack(side="left", padx=10, expand=True)
+
+        self.zoom_out_btn = ctk.CTkButton(self.island, text="−", width=36, height=36, corner_radius=18, 
+                                          fg_color="transparent", text_color=("#1C1C1E", "#F2F2F7"),
+                                          font=ctk.CTkFont(size=20), command=self._zoom_out)
+        self.zoom_out_btn.pack(side="right", padx=2)
+        
+        self.zoom_in_btn = ctk.CTkButton(self.island, text="+", width=36, height=36, corner_radius=18, 
+                                         fg_color="transparent", text_color=("#1C1C1E", "#F2F2F7"),
+                                         font=ctk.CTkFont(size=20), command=self._zoom_in)
+        self.zoom_in_btn.pack(side="right", padx=2)
 
         self.prev_btn = ctk.CTkButton(self.island, text="⏪", width=44, height=44, corner_radius=22, fg_color="transparent", command=self._prev_page)
         self.prev_btn.pack(side="right", padx=5)
@@ -344,105 +355,6 @@ class AudileApp(ctk.CTk):
                                    bbox[0]*z + x_off - 10, bbox[3]*z + y_off - 2, 
                                    fill=self.CLR_ACCENT, outline="", tags="focus")
 
-    def _build_word_timeline(self, words, total_duration):
-        """Build a pre-calculated timeline of word start/end times.
-        
-        Uses syllable-weighted duration for more accurate timing.
-        Longer words with more syllables get proportionally more time.
-        """
-        if not words or total_duration <= 0:
-            return []
-        
-        # Calculate syllable weight for each word (approximation: vowel groups)
-        def count_syllables(word):
-            vowels = 'aeiouyAEIOUY'
-            count = 0
-            prev_vowel = False
-            for char in word:
-                is_vowel = char in vowels
-                if is_vowel and not prev_vowel:
-                    count += 1
-                prev_vowel = is_vowel
-            return max(1, count)  # minimum 1 syllable
-        
-        # Calculate weights
-        weights = []
-        for word in words:
-            word_text = word.get("text", "a")
-            syllables = count_syllables(word_text)
-            weights.append(syllables)
-        
-        total_weight = sum(weights)
-        if total_weight == 0:
-            total_weight = len(words)
-            weights = [1] * len(words)
-        
-        # Build timeline with cumulative times
-        timeline = []
-        current_time = 0.0
-        for i, word in enumerate(words):
-            word_duration = (weights[i] / total_weight) * total_duration
-            timeline.append({
-                "word": word,
-                "start": current_time,
-                "end": current_time + word_duration
-            })
-            current_time += word_duration
-        
-        return timeline
-    
-    def _animate_word_timeline(self, start_time, timeline):
-        """Animate word highlights by looking up current position in pre-calculated timeline."""
-        if not self.is_playing or not self.tts_engine.is_speaking():
-            return
-        
-        if not timeline:
-            return
-        
-        elapsed = time.time() - start_time
-        
-        # Binary search for current word (faster for long texts)
-        current_word = None
-        for entry in timeline:
-            if entry["start"] <= elapsed < entry["end"]:
-                current_word = entry["word"]
-                break
-        
-        # Fallback: if past all words, show last word
-        if current_word is None and elapsed >= timeline[-1]["end"]:
-            current_word = timeline[-1]["word"]
-        
-        if current_word:
-            self._highlight_word(current_word["bbox"])
-        
-        # Continue animation loop
-        self.after(25, lambda: self._animate_word_timeline(start_time, timeline))
-    
-    def _estimate_block_duration(self, text):
-        """Estimate how long it will take to speak a block of text."""
-        # Base rate: ~150 words per minute at rate 0.5 (slider 1.0)
-        # Slider 1.0 -> rate 0.5 -> 2.5 words/sec -> ~12 chars/sec
-        # Slider 3.0 -> rate 1.0 -> 5 words/sec -> ~24 chars/sec
-        slider_val = self.speed_slider.get()
-        av_rate = min(1.0, 0.2 + (slider_val * 0.3))
-        
-        # Chars per second scales with rate
-        # At rate 0.5: ~12 cps, at rate 1.0: ~24 cps
-        chars_per_sec = 12.0 * (av_rate / 0.5)
-        
-        return len(text) / chars_per_sec
-
-    def _highlight_word(self, bbox):
-        self.canvas.delete("word_highlight")
-        coords = self.canvas.coords("page")
-        if not coords: return
-        x_off, y_off, z = coords[0], coords[1], self.zoom_factor
-        
-        # Apple Music Style Pill-Highlight (Underline + Subtle Glow)
-        self.canvas.create_rectangle(bbox[0]*z + x_off, bbox[3]*z + y_off - 3, 
-                                   bbox[2]*z + x_off, bbox[3]*z + y_off + 1, 
-                                   fill=self.CLR_ACCENT, outline="", tags="word_highlight")
-
     def _play(self):
         if not self.current_page_blocks: return
         if self.is_playing:
@@ -456,21 +368,8 @@ class AudileApp(ctk.CTk):
         if not self.is_playing: return
         if self.current_block_index < len(self.current_page_blocks):
             block = self.current_page_blocks[self.current_block_index]
-            words = block.get("words", [])
-            text = block["text"]
-            
-            # Pre-calculate word timeline before speaking
-            estimated_duration = self._estimate_block_duration(text)
-            timeline = self._build_word_timeline(words, estimated_duration)
-            
-            # Start speaking
-            self.tts_engine.speak(text)
+            self.tts_engine.speak(block["text"])
             self._highlight_current_block()
-            
-            # Start timeline-based animation
-            if timeline:
-                self.after(50, lambda: self._animate_word_timeline(time.time(), timeline))
-            
             self.after(100, self._check_speech_status)
         else:
             self._on_page_finished()
@@ -501,7 +400,6 @@ class AudileApp(ctk.CTk):
         self.is_playing = False
         self.play_btn.configure(text="▶")
         self.tts_engine.stop()
-        self.canvas.delete("word_highlight")
 
     def _toggle_play(self):
         if self.is_playing and not self.tts_engine.is_paused: self._pause()
@@ -519,21 +417,54 @@ class AudileApp(ctk.CTk):
 
     def _on_mousewheel(self, event):
         """Native macOS trackpad scroll support (two-finger drag)."""
-        # On macOS, delta is often very small or large. 
         if event.num == 4 or event.delta > 0:
             self.canvas.yview_scroll(-1, "units")
         elif event.num == 5 or event.delta < 0:
             self.canvas.yview_scroll(1, "units")
 
     def _on_pinch_zoom(self, event):
-        """Approximate native pinch-to-zoom using Control+MouseWheel."""
+        """Pinch-to-zoom using Control+MouseWheel."""
         if event.delta > 0:
-            self.zoom_factor *= 1.05
+            self._zoom_in()
         else:
-            self.zoom_factor *= 0.95
-        # Limit zoom between 50% and 500%
-        self.zoom_factor = max(0.5, min(5.0, self.zoom_factor))
+            self._zoom_out()
+    
+    def _zoom_in(self):
+        self.zoom_factor = min(5.0, self.zoom_factor * 1.15)
         self._render_page(force=True)
+    
+    def _zoom_out(self):
+        self.zoom_factor = max(0.5, self.zoom_factor * 0.85)
+        self._render_page(force=True)
+    
+    def _on_canvas_click(self, event):
+        """Click on a paragraph to start reading from there."""
+        if not self.current_page_blocks:
+            return
+        
+        # Get click position relative to page
+        coords = self.canvas.coords("page")
+        if not coords:
+            return
+        x_off, y_off = coords[0], coords[1]
+        z = self.zoom_factor
+        
+        # Convert click to PDF coordinates
+        click_x = (event.x - x_off) / z
+        click_y = (event.y - y_off) / z
+        
+        # Find which block was clicked
+        for i, block in enumerate(self.current_page_blocks):
+            bbox = block["bbox"]
+            if bbox[0] <= click_x <= bbox[2] and bbox[1] <= click_y <= bbox[3]:
+                # Stop current playback and start from this block
+                self._stop()
+                self.current_block_index = i
+                self._highlight_current_block()
+                self.is_playing = True
+                self.play_btn.configure(text="■")
+                self._speak_current_block()
+                return
 
     def _on_speed_change(self, v):
         self.tts_engine.set_rate(v)
