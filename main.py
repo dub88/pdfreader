@@ -344,54 +344,93 @@ class AudileApp(ctk.CTk):
                                    bbox[0]*z + x_off - 10, bbox[3]*z + y_off - 2, 
                                    fill=self.CLR_ACCENT, outline="", tags="focus")
 
-    def _animate_word_highlights(self, start_time, total_chars):
-        """Calibrated word highlighting loop synchronized to actual TTS rate."""
-        if not self.is_playing or not self.tts_engine.is_speaking(): return
-
+    def _build_word_timeline(self, words, total_duration):
+        """Build a pre-calculated timeline of word start/end times.
+        
+        Uses syllable-weighted duration for more accurate timing.
+        Longer words with more syllables get proportionally more time.
+        """
+        if not words or total_duration <= 0:
+            return []
+        
+        # Calculate syllable weight for each word (approximation: vowel groups)
+        def count_syllables(word):
+            vowels = 'aeiouyAEIOUY'
+            count = 0
+            prev_vowel = False
+            for char in word:
+                is_vowel = char in vowels
+                if is_vowel and not prev_vowel:
+                    count += 1
+                prev_vowel = is_vowel
+            return max(1, count)  # minimum 1 syllable
+        
+        # Calculate weights
+        weights = []
+        for word in words:
+            word_text = word.get("text", "a")
+            syllables = count_syllables(word_text)
+            weights.append(syllables)
+        
+        total_weight = sum(weights)
+        if total_weight == 0:
+            total_weight = len(words)
+            weights = [1] * len(words)
+        
+        # Build timeline with cumulative times
+        timeline = []
+        current_time = 0.0
+        for i, word in enumerate(words):
+            word_duration = (weights[i] / total_weight) * total_duration
+            timeline.append({
+                "word": word,
+                "start": current_time,
+                "end": current_time + word_duration
+            })
+            current_time += word_duration
+        
+        return timeline
+    
+    def _animate_word_timeline(self, start_time, timeline):
+        """Animate word highlights by looking up current position in pre-calculated timeline."""
+        if not self.is_playing or not self.tts_engine.is_speaking():
+            return
+        
+        if not timeline:
+            return
+        
         elapsed = time.time() - start_time
         
-        # Calibrated rate: AVFoundation rate 0.5 = ~180 wpm = ~15 chars/sec
-        # Rate formula: 0.2 + (slider * 0.3), clamped to [0, 1]
-        # At slider 1.0: rate=0.5 -> 15 cps
-        # At slider 3.0: rate=1.1->1.0 -> ~30 cps
+        # Binary search for current word (faster for long texts)
+        current_word = None
+        for entry in timeline:
+            if entry["start"] <= elapsed < entry["end"]:
+                current_word = entry["word"]
+                break
+        
+        # Fallback: if past all words, show last word
+        if current_word is None and elapsed >= timeline[-1]["end"]:
+            current_word = timeline[-1]["word"]
+        
+        if current_word:
+            self._highlight_word(current_word["bbox"])
+        
+        # Continue animation loop
+        self.after(25, lambda: self._animate_word_timeline(start_time, timeline))
+    
+    def _estimate_block_duration(self, text):
+        """Estimate how long it will take to speak a block of text."""
+        # Base rate: ~150 words per minute at rate 0.5 (slider 1.0)
+        # Slider 1.0 -> rate 0.5 -> 2.5 words/sec -> ~12 chars/sec
+        # Slider 3.0 -> rate 1.0 -> 5 words/sec -> ~24 chars/sec
         slider_val = self.speed_slider.get()
         av_rate = min(1.0, 0.2 + (slider_val * 0.3))
-        # AVFoundation rate scales linearly: 0.5 = 1x, 1.0 = 2x
-        speed_multiplier = av_rate / 0.5
-        chars_per_sec = 15.0 * speed_multiplier
         
-        est_idx = int(elapsed * chars_per_sec)
+        # Chars per second scales with rate
+        # At rate 0.5: ~12 cps, at rate 1.0: ~24 cps
+        chars_per_sec = 12.0 * (av_rate / 0.5)
         
-        if est_idx < total_chars:
-            self._on_word_spoken(est_idx, 1)
-            self.after(30, lambda: self._animate_word_highlights(start_time, total_chars))
-
-    def _on_word_spoken(self, char_location, length):
-        """Highlight word at the given character offset using word boundaries."""
-        if not self.is_playing or not self.current_page_blocks: return
-        if self.current_block_index >= len(self.current_page_blocks): return
-        
-        block = self.current_page_blocks[self.current_block_index]
-        words = block.get("words", [])
-        if not words: return
-        
-        text = block["text"]
-        if not text: return
-        
-        # Find word at character offset using accumulated lengths
-        char_count = 0
-        target_word = words[0]  # default to first word
-        for word in words:
-            word_text = word.get("text", "")
-            word_len = len(word_text) + 1  # +1 for space
-            if char_count + word_len > char_location:
-                target_word = word
-                break
-            char_count += word_len
-        else:
-            target_word = words[-1]  # fallback to last word
-        
-        self._highlight_word(target_word["bbox"])
+        return len(text) / chars_per_sec
 
     def _highlight_word(self, bbox):
         self.canvas.delete("word_highlight")
@@ -417,10 +456,21 @@ class AudileApp(ctk.CTk):
         if not self.is_playing: return
         if self.current_block_index < len(self.current_page_blocks):
             block = self.current_page_blocks[self.current_block_index]
-            self.tts_engine.speak(block["text"])
+            words = block.get("words", [])
+            text = block["text"]
+            
+            # Pre-calculate word timeline before speaking
+            estimated_duration = self._estimate_block_duration(text)
+            timeline = self._build_word_timeline(words, estimated_duration)
+            
+            # Start speaking
+            self.tts_engine.speak(text)
             self._highlight_current_block()
-            # Start estimation loop for word-level highlights
-            self.after(50, lambda: self._animate_word_highlights(time.time(), len(block["text"])))
+            
+            # Start timeline-based animation
+            if timeline:
+                self.after(50, lambda: self._animate_word_timeline(time.time(), timeline))
+            
             self.after(100, self._check_speech_status)
         else:
             self._on_page_finished()
