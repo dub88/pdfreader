@@ -70,7 +70,7 @@ Even with `self.after`, the initial entry point into the Python environment (the
 The delegate was forcibly disabled again in `tts_engine.py`. For future implementations of word-level highlighting, we must use a polling approach (checking `output_channel` or timing estimates) or a rigorous `PyObjC` specific event loop bridge (e.g. `AppHelper.runEventLoop`), which would replace the standard Tkinter `mainloop`.
 
 **Resolution (Jan 29, 2026):**
-Implemented a Main Thread Estimation Loop in `main.py` (`_animate_highlight`). This loop uses a timer (`self.after`) to estimate the read position based on elapsed time and character-per-second constants. This provides the visual effect of karaoke highlighting without any dangerous background thread interactions, effectively bypassing the GIL crash.
+Initially attempted word-level estimation, but transitioned to a stable **Line Focus** style. The current implementation uses a vertical sidebar indicator (Apple Music style) and block-level underlining. This provides clear focus on the active text while remaining perfectly stable and avoiding background thread crashes.
 
 ### 7. Application Icon Integration
 **Action:**

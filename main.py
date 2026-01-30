@@ -264,33 +264,39 @@ class AudileApp(ctk.CTk):
             self.canvas.config(scrollregion=(0, 0, max(canvas_width, img_w + x_off*2), img_h + 80))
             self.current_page_rendered = self.current_page_num
 
-    def _animate_highlight(self, start_time, total_chars, words):
-        """Word-level highlight loop based on time estimation."""
-        if not self.is_playing: return
-        if not self.tts_engine.is_speaking(): return
-
-        elapsed = time.time() - start_time
-        # ~14 characters per second adjusted by user speed
-        chars_per_sec = 14.0 * self.speed_slider.get()
-        est_idx = int(elapsed * chars_per_sec)
-        
-        if est_idx < total_chars:
-            progress = est_idx / total_chars
-            word_idx = int(progress * len(words))
-            word_idx = max(0, min(word_idx, len(words) - 1))
-            if word_idx < len(words):
-                self._highlight_word(words[word_idx]["bbox"])
-            self.after(50, lambda: self._animate_highlight(start_time, total_chars, words))
-
-    def _highlight_word(self, bbox):
-        self.canvas.delete("word_highlight")
+    def _highlight_current_block(self):
+        """Draws a sidebar indicator and highlights the current text block."""
+        self.canvas.delete("highlight")
+        if not self.current_page_blocks or self.current_block_index >= len(self.current_page_blocks): 
+            return
+            
+        block = self.current_page_blocks[self.current_block_index]
+        bbox, z = block["bbox"], self.zoom_factor
         coords = self.canvas.coords("page")
         if not coords: return
-        x_off, y_off, z = coords[0], coords[1], self.zoom_factor
-        # Subtle underline highlight (Apple Style)
+        x_off, y_off = coords[0], coords[1]
+        
+        # --- SIDEBAR INDICATOR (Apple Music Style) ---
+        # Draw a thin vertical rectangle to the left of the page content
+        self.canvas.create_rectangle(x_off - 12, bbox[1]*z + y_off, 
+                                   x_off - 6, bbox[3]*z + y_off, 
+                                   fill=self.ACCENT_PINK, outline="", tags="highlight")
+        
+        # --- BLOCK UNDERLINE (Subtle Focus) ---
         self.canvas.create_rectangle(bbox[0]*z + x_off, bbox[3]*z + y_off - 1, 
                                    bbox[2]*z + x_off, bbox[3]*z + y_off + 1, 
-                                   fill=self.ACCENT_PINK, outline="", tags="word_highlight")
+                                   fill=self.ACCENT_PINK, outline="", tags="highlight")
+                                   
+        self._scroll_to_highlight(bbox[1]*z + y_off, bbox[3]*z + y_off)
+
+    def _scroll_to_highlight(self, hy0, hy1):
+        if not self.current_tk_img: return
+        img_h = self.current_tk_img.height() + 60
+        view_h = self.canvas.winfo_height()
+        if view_h <= 1: return
+        v_start, v_end = self.canvas.yview()
+        if hy0 < v_start * img_h + 60 or hy1 > v_end * img_h - 60:
+            self.canvas.yview_moveto(max(0, min(1.0, (hy0 - view_h/3) / img_h)))
 
     def _play(self):
         if not self.current_page_blocks: return
@@ -308,8 +314,8 @@ class AudileApp(ctk.CTk):
             # Phonetic fix for years
             txt = self._fix_years(block["text"])
             self.tts_engine.speak(txt)
-            # Trigger highlight loop
-            self.after(50, lambda: self._animate_highlight(time.time(), len(block["text"]), block["words"]))
+            # Trigger block highlight
+            self._highlight_current_block()
             self.after(100, self._check_speech_status)
         else:
             self._on_page_finished()
@@ -353,7 +359,7 @@ class AudileApp(ctk.CTk):
         self.is_playing = False
         self.play_button.configure(text="▶")
         self.tts_engine.stop()
-        self.canvas.delete("word_highlight")
+        self.canvas.delete("highlight")
 
     def _toggle_play(self):
         if self.is_playing and not self.tts_engine.is_paused: self._pause()
