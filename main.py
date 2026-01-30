@@ -36,7 +36,8 @@ class AudileApp(ctk.CTk):
         self.geometry("1200x800")
         
         # Apply True macOS Vibrancy (Background Blur)
-        self._apply_native_vibrancy()
+        # DISABLED: Causing Segfaults on startup. Restoring stability first.
+        # self._apply_native_vibrancy()
         
         # Initialize engines
         self.pdf_engine = None
