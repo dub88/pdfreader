@@ -208,7 +208,7 @@ class AudileApp(ctk.CTk):
     def _load_pdf(self, file_path, doc_type="Book"):
         if self.is_loading: return
         self._stop() 
-        self.status_label.configure(text=f"Syncing: {os.path.basename(file_path)}...")
+        self.version_label.configure(text=f"Syncing: {os.path.basename(file_path)}...")
         self.is_loading = True
         def extract():
             try:
@@ -229,7 +229,7 @@ class AudileApp(ctk.CTk):
         if self.current_pdf_path not in self.library:
             self.library[self.current_pdf_path] = {"page": 1, "title": os.path.basename(self.current_pdf_path), "doc_type": doc_type}
         self.current_page_num = self.library[self.current_pdf_path].get("page", 1)
-        self.status_label.configure(text=f"Ready: {self.library[self.current_pdf_path]['title']}")
+        self.version_label.configure(text=f"Ready: {self.library[self.current_pdf_path]['title']}")
         self._load_page_data(self.current_page_num)
         self._refresh_bookmark_list()
         self._refresh_library_list()
@@ -402,7 +402,7 @@ class AudileApp(ctk.CTk):
             self.after(600, self._speak_current_block)
         else:
             self._stop()
-            self.status_label.configure(text="Finished")
+            self.version_label.configure(text="Finished")
 
     def _pause(self): 
         self.tts_engine.pause()
