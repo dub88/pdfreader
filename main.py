@@ -68,7 +68,11 @@ class AudileApp(ctk.CTk):
         
         self.logo_label = ctk.CTkLabel(self.sidebar, text="Audile", text_color=self.ACCENT_PINK,
                                        font=ctk.CTkFont(family="SF Pro Display", size=36, weight="bold"))
-        self.logo_label.pack(padx=20, pady=(40, 10))
+        self.logo_label.pack(padx=20, pady=(40, 0))
+        
+        self.version_label = ctk.CTkLabel(self.sidebar, text="Version 2.1 - ACTIVE SYNC", 
+                                        font=ctk.CTkFont(size=12, weight="bold"), text_color=self.ACCENT_PINK)
+        self.version_label.pack(padx=20, pady=(0, 10))
 
         self.tabview = ctk.CTkTabview(self.sidebar, width=250, 
                                       segmented_button_selected_color=self.ACCENT_PINK,
@@ -181,8 +185,7 @@ class AudileApp(ctk.CTk):
         self.progress_bar.grid(row=1, column=0, padx=30, pady=(0, 25), sticky="ew")
         self.progress_bar.set(0)
 
-        self.status_label = ctk.CTkLabel(self.content_frame, text="Audile v2.0 - NUCLEAR REBUILD", anchor="w", font=ctk.CTkFont(size=11), text_color=self.ACCENT_PINK)
-        self.status_label.grid(row=2, column=0, padx=30, pady=(0, 10), sticky="ew")
+        # Status label moved to sidebar under logo
 
     def _open_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("PDF Files", "*.pdf")])
@@ -281,6 +284,11 @@ class AudileApp(ctk.CTk):
 
         if location is not None:
             self._highlight_speech_range(location, length)
+        elif self.tts_engine.is_speaking():
+            # VISUAL FALLBACK: If sync packets are delayed, show first line
+            # so the user knows focusing is working.
+            if not self.canvas.find_withtag("highlight"):
+                self._highlight_speech_range(0, 1)
             
         self.after(20, self._poll_tts_queue)
 
