@@ -234,11 +234,11 @@ class AudileApp(ctk.CTk):
                                          font=ctk.CTkFont(size=20), command=self._zoom_in)
         self.zoom_in_btn.pack(side="right", padx=2)
 
-        self.prev_btn = ctk.CTkButton(self.island, text="⏪", width=44, height=44, corner_radius=22, fg_color="transparent", command=self._prev_page)
-        self.prev_btn.pack(side="right", padx=5)
-        
         self.next_btn = ctk.CTkButton(self.island, text="⏩", width=44, height=44, corner_radius=22, fg_color="transparent", command=self._next_page)
         self.next_btn.pack(side="right", padx=(5, 13))
+
+        self.prev_btn = ctk.CTkButton(self.island, text="⏪", width=44, height=44, corner_radius=22, fg_color="transparent", command=self._prev_page)
+        self.prev_btn.pack(side="right", padx=5)
 
         # Overall Progress Bar (Hidden Slim line at the very top of main frame)
         self.progress_bar = ctk.CTkProgressBar(self.main_container, height=3, progress_color=self.CLR_ACCENT, fg_color=("#E5E5EA", "#3A3A3C"))
@@ -361,6 +361,19 @@ class AudileApp(ctk.CTk):
         self.canvas.create_rectangle(bbox[0]*z + x_off - 15, bbox[1]*z + y_off + 2, 
                                    bbox[0]*z + x_off - 10, bbox[3]*z + y_off - 2, 
                                    fill=self.CLR_ACCENT, outline="", tags="focus")
+        
+        # Auto-scroll to keep paragraph in view
+        if self.is_playing:
+            canvas_h = self.canvas.winfo_height()
+            if canvas_h > 1:
+                # Calculate the Y position in the scrollregion
+                block_y_center = (bbox[1] + bbox[3]) / 2 * z + y_off
+                scroll_region = self.canvas.cget("scrollregion").split()
+                if len(scroll_region) == 4:
+                    total_h = float(scroll_region[3])
+                    # Move to position so block is roughly at 40% height of screen
+                    target_y = (block_y_center - canvas_h * 0.4) / total_h
+                    self.canvas.yview_moveto(max(0, min(1, target_y)))
 
     def _play(self):
         if not self.current_page_blocks: return
@@ -424,19 +437,19 @@ class AudileApp(ctk.CTk):
 
     def _on_mousewheel(self, event):
         """macOS trackpad and mouse wheel scroll."""
-        # macOS uses delta values; positive = scroll up, negative = scroll down
-        # The delta can be large (120 on Windows) or small (1-5 on macOS trackpad)
-        if event.delta > 0:
-            self.canvas.yview_scroll(-1, "units")
-        elif event.delta < 0:
-            self.canvas.yview_scroll(1, "units")
-        return "break"  # Prevent event propagation
+        # On macOS, num might be used or delta. delta is typically 120 per click on Windows, 
+        # but modern macOS trackpads send frequent small deltas or event.num 4/5.
+        if event.num == 4 or event.delta > 0:
+            self.canvas.yview_scroll(-2, "units")
+        elif event.num == 5 or event.delta < 0:
+            self.canvas.yview_scroll(2, "units")
+        return "break"
 
     def _on_pinch_zoom(self, event):
         """Pinch-to-zoom using Control+MouseWheel."""
-        if event.delta > 0:
+        if event.num == 4 or event.delta > 0:
             self._zoom_in()
-        else:
+        elif event.num == 5 or event.delta < 0:
             self._zoom_out()
         return "break"
     
