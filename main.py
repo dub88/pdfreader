@@ -181,7 +181,7 @@ class AudileApp(ctk.CTk):
         self.progress_bar.grid(row=1, column=0, padx=30, pady=(0, 25), sticky="ew")
         self.progress_bar.set(0)
 
-        self.status_label = ctk.CTkLabel(self, text="Ready", anchor="w", font=ctk.CTkFont(size=11), text_color="#8E8E93")
+        self.status_label = ctk.CTkLabel(self, text="Audile v1.1 Refined Line Focus", anchor="w", font=ctk.CTkFont(size=11), text_color="#8E8E93")
         self.status_label.grid(row=1, column=1, padx=30, pady=(0, 10), sticky="ew")
 
     def _open_file(self):
