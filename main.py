@@ -93,6 +93,7 @@ class AudileApp(ctk.CTk):
             print(f"Native vibrancy skipped: {e}")
 
     def _setup_ui(self):
+        # Appearance - Default to System but allow the user's OS to dictate
         ctk.set_appearance_mode("system")
         ctk.set_default_color_theme("blue") 
 
@@ -100,23 +101,24 @@ class AudileApp(ctk.CTk):
         self.grid_rowconfigure(0, weight=1)
 
         # --- SIDEBAR (Editorial Style) ---
-        self.sidebar = ctk.CTkFrame(self, width=300, corner_radius=0, fg_color="transparent")
-        self.sidebar.grid(row=0, column=0, sticky="nsew", padx=(20, 0), pady=20)
+        self.sidebar = ctk.CTkFrame(self, width=300, corner_radius=0, fg_color=("#E5E5EA", "#111112"))
+        self.sidebar.grid(row=0, column=0, sticky="nsew", padx=(0, 0), pady=0)
         
         self.logo_label = ctk.CTkLabel(self.sidebar, text="Audile", text_color=self.CLR_ACCENT,
                                        font=ctk.CTkFont(family="SF Pro Display", size=42, weight="bold"))
-        self.logo_label.pack(anchor="w", padx=20, pady=(20, 30))
+        self.logo_label.pack(anchor="w", padx=30, pady=(40, 30))
 
         # Functional Tabview Switcher
         self.nav_tab_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        self.nav_tab_frame.pack(fill="x", padx=10)
+        self.nav_tab_frame.pack(fill="x", padx=20)
 
-        nav_opts = [("Library", "Library"), ("Controls", "Playing"), ("Notes", "Notes")]
+        nav_opts = [("Library", "Library"), ("Playing", "Playing"), ("Notes", "Notes")]
         self.nav_btns = {}
         for label, target in nav_opts:
+            # Force high-contrast text colors
             btn = ctk.CTkButton(self.nav_tab_frame, text=label, height=45, corner_radius=12,
-                                fg_color="transparent", text_color=("black", "white"),
-                                hover_color=self.CLR_BORDER, font=ctk.CTkFont(family="SF Pro Text", size=15, weight="bold"),
+                                fg_color="transparent", text_color=("#1C1C1E", "#F2F2F7"),
+                                hover_color=("#D1D1D6", "#2C2C2E"), font=ctk.CTkFont(family="SF Pro Text", size=15, weight="bold"),
                                 command=lambda t=target: self._switch_nav(t))
             btn.pack(pady=2, fill="x")
             self.nav_btns[target] = btn
@@ -148,12 +150,12 @@ class AudileApp(ctk.CTk):
         self.voice_btn_frame.pack(fill="x", padx=10)
         
         self.preview_btn = ctk.CTkButton(self.voice_btn_frame, text="🔊 Preview", height=35, corner_radius=10, 
-                                         fg_color="transparent", border_width=1, text_color=("black", "white"),
+                                         fg_color="transparent", border_width=1, text_color=("#1C1C1E", "#F2F2F7"),
                                          command=self._preview_voice)
         self.preview_btn.pack(side="left", expand=True, fill="x", padx=(0, 2))
         
         self.hide_voice_btn = ctk.CTkButton(self.voice_btn_frame, text="👁 Hide", height=35, corner_radius=10, 
-                                            fg_color="transparent", border_width=1, text_color=("black", "white"),
+                                            fg_color="transparent", border_width=1, text_color=("#1C1C1E", "#F2F2F7"),
                                             command=self._hide_current_voice)
         self.hide_voice_btn.pack(side="left", expand=True, fill="x", padx=(2, 0))
 
@@ -165,6 +167,16 @@ class AudileApp(ctk.CTk):
                                                 command=self._refresh_voice_list)
         self.premium_only_switch.select()
         self.premium_only_switch.pack(padx=10, pady=10)
+
+        # Help / Reset at bottom
+        self.help_frame = ctk.CTkFrame(self.play_tab, fg_color="transparent")
+        self.help_frame.pack(side="bottom", pady=10)
+        self.download_help_btn = ctk.CTkButton(self.help_frame, text="❓ Missing Voices?", height=20, font=ctk.CTkFont(size=10), 
+                                               fg_color="transparent", text_color=("#1C1C1E", "#8E8E93"), command=self._show_voice_help)
+        self.download_help_btn.pack()
+        self.reset_voices_btn = ctk.CTkButton(self.help_frame, text="↺ Reset Hidden Voices", height=20, font=ctk.CTkFont(size=10), 
+                                               fg_color="transparent", text_color=("#1C1C1E", "#8E8E93"), command=self._reset_hidden_voices)
+        self.reset_voices_btn.pack()
 
         # --- TAB: NOTES ---
         self.add_bmk_btn = ctk.CTkButton(self.notes_tab, text="🔖 New Highlight", height=45, corner_radius=12,
@@ -429,18 +441,32 @@ class AudileApp(ctk.CTk):
         self._load_page_data(self.current_page_num)
 
     def _on_mousewheel(self, event):
-        self.canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+        """Native macOS trackpad scroll support (two-finger drag)."""
+        # On macOS, delta is often very small or large. 
+        if event.num == 4 or event.delta > 0:
+            self.canvas.yview_scroll(-1, "units")
+        elif event.num == 5 or event.delta < 0:
+            self.canvas.yview_scroll(1, "units")
 
     def _on_pinch_zoom(self, event):
-        if event.delta > 0: self.zoom_factor *= 1.1
-        else: self.zoom_factor *= 0.9
+        """Approximate native pinch-to-zoom using Control+MouseWheel."""
+        if event.delta > 0:
+            self.zoom_factor *= 1.05
+        else:
+            self.zoom_factor *= 0.95
+        # Limit zoom between 50% and 500%
         self.zoom_factor = max(0.5, min(5.0, self.zoom_factor))
         self._render_page(force=True)
 
     def _on_speed_change(self, v): self.tts_engine.set_rate(v)
-    def _on_voice_change(self, dn):
-        for v in self.voices:
-            if dn.startswith(v['name']): self.tts_engine.set_voice(v['id']); break
+    def _on_voice_change(self, display_name):
+        """Robustly switch narrator based on menu selection."""
+        # Find voice by display name match
+        for i, dn in enumerate(self.voice_display_names):
+            if dn == display_name:
+                self.tts_engine.set_voice(self.voices[i]['id'])
+                # Auto-stop and preview if playing? No, just set.
+                break
 
     def _refresh_library_list(self):
         for widget in self.lib_scroll.winfo_children(): widget.destroy()
