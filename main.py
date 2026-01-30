@@ -345,35 +345,53 @@ class AudileApp(ctk.CTk):
                                    fill=self.CLR_ACCENT, outline="", tags="focus")
 
     def _animate_word_highlights(self, start_time, total_chars):
-        """Estimation-based word highlighting loop."""
+        """Calibrated word highlighting loop synchronized to actual TTS rate."""
         if not self.is_playing or not self.tts_engine.is_speaking(): return
 
         elapsed = time.time() - start_time
-        # ~15 characters per second adjusted by speed
-        chars_per_sec = 15.0 * self.speed_slider.get()
+        
+        # Calibrated rate: AVFoundation rate 0.5 = ~180 wpm = ~15 chars/sec
+        # Rate formula: 0.2 + (slider * 0.3), clamped to [0, 1]
+        # At slider 1.0: rate=0.5 -> 15 cps
+        # At slider 3.0: rate=1.1->1.0 -> ~30 cps
+        slider_val = self.speed_slider.get()
+        av_rate = min(1.0, 0.2 + (slider_val * 0.3))
+        # AVFoundation rate scales linearly: 0.5 = 1x, 1.0 = 2x
+        speed_multiplier = av_rate / 0.5
+        chars_per_sec = 15.0 * speed_multiplier
+        
         est_idx = int(elapsed * chars_per_sec)
         
         if est_idx < total_chars:
             self._on_word_spoken(est_idx, 1)
-            self.after(50, lambda: self._animate_word_highlights(start_time, total_chars))
+            self.after(30, lambda: self._animate_word_highlights(start_time, total_chars))
 
-    def _on_word_spoken(self, location, length):
-        """Fluid word-level highlight via estimation (GIL-Safe)."""
+    def _on_word_spoken(self, char_location, length):
+        """Highlight word at the given character offset using word boundaries."""
         if not self.is_playing or not self.current_page_blocks: return
         if self.current_block_index >= len(self.current_page_blocks): return
         
         block = self.current_page_blocks[self.current_block_index]
-        if not block.get("words"): return
+        words = block.get("words", [])
+        if not words: return
         
-        # Word selection logic based on character location
-        total_chars = len(block["text"])
-        if total_chars == 0: return
+        text = block["text"]
+        if not text: return
         
-        progress = location / total_chars
-        word_idx = int(progress * len(block["words"]))
-        word_idx = max(0, min(word_idx, len(block["words"]) - 1))
+        # Find word at character offset using accumulated lengths
+        char_count = 0
+        target_word = words[0]  # default to first word
+        for word in words:
+            word_text = word.get("text", "")
+            word_len = len(word_text) + 1  # +1 for space
+            if char_count + word_len > char_location:
+                target_word = word
+                break
+            char_count += word_len
+        else:
+            target_word = words[-1]  # fallback to last word
         
-        self._highlight_word(block["words"][word_idx]["bbox"])
+        self._highlight_word(target_word["bbox"])
 
     def _highlight_word(self, bbox):
         self.canvas.delete("word_highlight")
