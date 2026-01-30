@@ -8,11 +8,31 @@ import time
 import os
 import re
 from typing import List, Dict
+import queue
+import objc
+from Foundation import NSObject
+
+class TTSDelegate(NSObject):
+    def initWithQueue_(self, q):
+        self = objc.super(TTSDelegate, self).init()
+        if self:
+            self._queue = q
+        return self
+
+    @objc.signature(b'v@:@{_NSRange=QQ}@')
+    def speechSynthesizer_willSpeakRangeOfSpeechString_utterance_(self, synth, char_range, utterance):
+        # DEBUG: See if we are even receiving packets from the OS
+        print(f"[DEBUG DELEGATE] Range: {char_range.location}, {char_range.length}")
+        if hasattr(self, "_queue"):
+            self._queue.put((char_range.location, char_range.length))
 
 class TTSEngine:
     def __init__(self):
         # Using native macOS speech engine
         self._synth = AVSpeechSynthesizer.alloc().init()
+        self.queue = queue.Queue()
+        self._delegate = TTSDelegate.alloc().initWithQueue_(self.queue)
+        self._synth.setDelegate_(self._delegate)
         self._voice = None
         self._rate = 0.5 
         self._volume = 1.0

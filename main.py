@@ -181,7 +181,7 @@ class AudileApp(ctk.CTk):
         self.progress_bar.grid(row=1, column=0, padx=30, pady=(0, 25), sticky="ew")
         self.progress_bar.set(0)
 
-        self.status_label = ctk.CTkLabel(self, text="Audile v1.3 Smart Focus", anchor="w", font=ctk.CTkFont(size=11), text_color="#8E8E93")
+        self.status_label = ctk.CTkLabel(self, text="Audile v1.5 Sync Debug", anchor="w", font=ctk.CTkFont(size=11), text_color="#8E8E93")
         self.status_label.grid(row=1, column=1, padx=30, pady=(0, 10), sticky="ew")
 
     def _open_file(self):
@@ -264,53 +264,74 @@ class AudileApp(ctk.CTk):
             self.canvas.config(scrollregion=(0, 0, max(canvas_width, img_w + x_off*2), img_h + 80))
             self.current_page_rendered = self.current_page_num
 
-    def _animate_highlight(self, start_time, total_chars, lines):
-        """Estimation-based line highlighting loop (Safe for GIL)."""
-        if not self.is_playing: return
-        if not self.tts_engine.is_speaking(): return
-
-        elapsed = time.time() - start_time
-        # ~14 characters per second adjusted by user speed
-        chars_per_sec = 14.0 * self.speed_slider.get()
-        est_idx = int(elapsed * chars_per_sec)
-        
-        if est_idx < total_chars:
-            # Find line at this estimated character index
-            # This is an approximation based on text length share of each line
-            current_count = 0
-            active_line = lines[0]
-            for line in lines:
-                current_count += len(line["text"]) + 1 # +1 for space
-                if est_idx <= current_count:
-                    active_line = line
-                    break
+    def _poll_tts_queue(self):
+        """Pick up real-time speech coordinates from the queue and highlight accordingly."""
+        if not self.is_playing: 
+            self._polling_active = False
+            return
             
-            self._highlight_line(active_line["bbox"])
-            self.after(50, lambda: self._animate_highlight(start_time, total_chars, lines))
+        # Clear queue and take latest
+        location, length = None, None
+        try:
+            while True:
+                loc, l = self.tts_engine.queue.get_nowait()
+                location, length = loc, l
+        except queue.Empty:
+            pass
 
-    def _highlight_line(self, bbox):
-        """Draws a local sidebar indicator and an underline for the current line."""
+        if location is not None:
+            self._highlight_speech_range(location, length)
+            
+        self.after(20, self._poll_tts_queue)
+
+    def _highlight_speech_range(self, location, length):
+        """Map a character range to a specific line and highlight it."""
+        if not self.current_page_blocks or self.current_block_index >= len(self.current_page_blocks):
+            return
+            
+        block = self.current_page_blocks[self.current_block_index]
+        if "lines" not in block: return
+        
+        # We MUST use the same phonetic logic as speak() to match lengths
+        curr_spoken_len = 0
+        target_line = None
+        for line in block["lines"]:
+            spoken_line = self._fix_years(line["text"])
+            l_len = len(spoken_line) + 1 # +1 for space between lines
+            if curr_spoken_len <= location < curr_spoken_len + l_len:
+                target_line = line
+                break
+            curr_spoken_len += l_len
+            
+        if target_line:
+            self._draw_line_highlight(target_line["bbox"])
+        else:
+            # Fallback to first line if we are confused
+            if block["lines"]:
+                self._draw_line_highlight(block["lines"][0]["bbox"])
+
+    def _draw_line_highlight(self, bbox):
         self.canvas.delete("highlight")
         z = self.zoom_factor
         coords = self.canvas.coords("page")
         if not coords: return
         x_off, y_off = coords[0], coords[1]
         
-        # --- LOCAL SIDEBAR INDICATOR ---
-        # Position it 10px to the left of the ACTUAL text bounding box
-        self.canvas.create_rectangle(bbox[0]*z + x_off - 10, bbox[1]*z + y_off + 2, 
-                                   bbox[0]*z + x_off - 6, bbox[3]*z + y_off - 2, 
-                                   fill=self.ACCENT_PINK, outline="", tags="highlight")
-        
-        # --- LINE UNDERLINE ---
+        # --- LOCALIZED UNDERLINE (Perfect Sync) ---
+        # Height: from y0 to y1. Position: under the line text.
         self.canvas.create_rectangle(bbox[0]*z + x_off, bbox[3]*z + y_off - 1, 
                                    bbox[2]*z + x_off, bbox[3]*z + y_off + 1, 
                                    fill=self.ACCENT_PINK, outline="", tags="highlight")
                                    
         self._scroll_to_highlight(bbox[1]*z + y_off, bbox[3]*z + y_off)
 
+    def _animate_highlight(self, start_time, total_chars, lines):
+        pass
+
+    def _highlight_line(self, bbox):
+        pass
+
     def _highlight_current_block(self):
-        """Legacy block highlight - now replaced by _animate_highlight."""
         pass
 
     def _scroll_to_highlight(self, hy0, hy1):
@@ -338,9 +359,8 @@ class AudileApp(ctk.CTk):
             # Phonetic fix for years
             txt = self._fix_years(block["text"])
             self.tts_engine.speak(txt)
-            # Trigger animation highlight loop for lines within this block
-            if "lines" in block and block["lines"]:
-                self.after(50, lambda: self._animate_highlight(time.time(), len(block["text"]), block["lines"]))
+            # Start the sync polling loop
+            self._poll_tts_queue()
             self.after(100, self._check_speech_status)
         else:
             self._on_page_finished()
