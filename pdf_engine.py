@@ -69,68 +69,30 @@ class PDFEngine:
             
         content_top, content_bottom = margin, page_height - margin
 
-        # Get detailed text with word coordinates
-        # "words" returns list of (x0, y0, x1, y1, "word", block_no, line_no, word_no)
-        words = page.get_text("words")
-        
-        # We still want to group by paragraphs (blocks) for natural reading
+        # Get detailed text with dictionary format for line-level control
         blocks = page.get_text("dict")["blocks"]
-        final_blocks = []
+        final_lines = []
         
         for b in blocks:
             if "lines" not in b: continue
             
-            block_text = ""
-            block_words = [] # To store (bbox, start_char, end_char)
-            
-            char_count = 0
             for line in b["lines"]:
+                line_text = ""
                 for span in line["spans"]:
-                    # Find words that fall within this span's bbox roughly
-                    span_text = span["text"]
-                    # Add span text to block
-                    block_text += span_text + " "
-                    
-                    # Store word data for this span
-                    # This is complex because get_text("words") and get_text("dict") 
-                    # might not align perfectly. Better approach:
-                    # Parse the span into words manually and use span bbox for alignment.
-            
-            cleaned = self._clean_text(block_text)
-            if cleaned:
-                # Store the block with a map of character ranges to bounding boxes
-                # For simplicity, we'll store the word bounding boxes for this block
-                block_words = self._extract_word_boxes(page, b["bbox"])
+                    line_text += span["text"] + " "
                 
-                final_blocks.append({
-                    "text": cleaned,
-                    "bbox": list(b["bbox"]),
-                    "words": block_words # List of {"text": "...", "bbox": [...]}
-                })
+                cleaned = self._clean_text(line_text)
+                if cleaned:
+                    line_words = self._extract_word_boxes(page, line["bbox"])
+                    final_lines.append({
+                        "text": cleaned,
+                        "bbox": list(line["bbox"]),
+                        "words": line_words
+                    })
 
-        # Merge blocks logic...
-        merged = []
-        if not final_blocks: return []
-        
-        curr = final_blocks[0]
-        for i in range(1, len(final_blocks)):
-            nxt = final_blocks[i]
-            dist = nxt["bbox"][1] - curr["bbox"][3]
-            
-            if 0 <= dist < 12:
-                curr["text"] += " " + nxt["text"]
-                curr["words"].extend(nxt["words"])
-                curr["bbox"][0] = min(curr["bbox"][0], nxt["bbox"][0])
-                curr["bbox"][2] = max(curr["bbox"][2], nxt["bbox"][2])
-                curr["bbox"][3] = nxt["bbox"][3]
-            else:
-                merged.append(curr)
-                curr = nxt
-        merged.append(curr)
-            
-        # Filter headers/footers
+        # Filter headers/footers based on margin
         result = []
-        for item in merged:
+        for item in final_lines:
             y_mid = (item["bbox"][1] + item["bbox"][3]) / 2
             if margin == 0 or (content_top <= y_mid <= content_bottom):
                 result.append(item)
