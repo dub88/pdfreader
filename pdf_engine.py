@@ -92,11 +92,12 @@ class PDFEngine:
             
             cleaned = self._clean_text(block_text)
             if cleaned:
-                # Store the block with its internal lines for precise highlighting
+                # Store the block with its internal lines and word mapping
                 final_blocks.append({
                     "text": cleaned,
                     "bbox": list(b["bbox"]),
-                    "lines": block_lines
+                    "lines": block_lines,
+                    "words": self._extract_word_boxes(page, b["bbox"])
                 })
 
         # Merge blocks heuristic (natural paragraphs)

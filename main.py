@@ -9,6 +9,7 @@ import threading
 import darkdetect
 import time
 import re
+from ctypes import c_void_p
 
 # High-Precision macOS Integration
 try:
@@ -304,6 +305,36 @@ class AudileApp(ctk.CTk):
         self._highlight_current_block()
         self.progress_bar.set(self.current_page_num / self.pdf_engine.total_pages)
 
+    def _highlight_current_block(self):
+        """Draws a professional focus indicator for the active block."""
+        self.canvas.delete("focus")
+        if not self.current_page_blocks or self.current_block_index >= len(self.current_page_blocks): 
+            return
+            
+        block = self.current_page_blocks[self.current_block_index]
+        bbox, z = block["bbox"], self.zoom_factor
+        coords = self.canvas.coords("page")
+        if not coords: return
+        x_off, y_off = coords[0], coords[1]
+        
+        # Sleek Sidebar Bar (localized to text column)
+        self.canvas.create_rectangle(bbox[0]*z + x_off - 15, bbox[1]*z + y_off + 2, 
+                                   bbox[0]*z + x_off - 10, bbox[3]*z + y_off - 2, 
+                                   fill=self.CLR_ACCENT, outline="", tags="focus")
+
+    def _animate_word_highlights(self, start_time, total_chars):
+        """Estimation-based word highlighting loop."""
+        if not self.is_playing or not self.tts_engine.is_speaking(): return
+
+        elapsed = time.time() - start_time
+        # ~15 characters per second adjusted by speed
+        chars_per_sec = 15.0 * self.speed_slider.get()
+        est_idx = int(elapsed * chars_per_sec)
+        
+        if est_idx < total_chars:
+            self._on_word_spoken(est_idx, 1)
+            self.after(50, lambda: self._animate_word_highlights(start_time, total_chars))
+
     def _on_word_spoken(self, location, length):
         """Fluid word-level highlight via estimation (GIL-Safe)."""
         if not self.is_playing or not self.current_page_blocks: return
@@ -347,6 +378,9 @@ class AudileApp(ctk.CTk):
         if self.current_block_index < len(self.current_page_blocks):
             block = self.current_page_blocks[self.current_block_index]
             self.tts_engine.speak(block["text"])
+            self._highlight_current_block()
+            # Start estimation loop for word-level highlights
+            self.after(50, lambda: self._animate_word_highlights(time.time(), len(block["text"])))
             self.after(100, self._check_speech_status)
         else:
             self._on_page_finished()
