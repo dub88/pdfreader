@@ -71,29 +71,58 @@ class PDFEngine:
 
         # Get detailed text with dictionary format for line-level control
         blocks = page.get_text("dict")["blocks"]
-        final_lines = []
+        final_blocks = []
         
         for b in blocks:
             if "lines" not in b: continue
+            
+            block_text = ""
+            block_lines = []
             
             for line in b["lines"]:
                 line_text = ""
                 for span in line["spans"]:
                     line_text += span["text"] + " "
                 
-                cleaned = self._clean_text(line_text)
-                if cleaned:
-                    line_words = self._extract_word_boxes(page, line["bbox"])
-                    final_lines.append({
-                        "text": cleaned,
-                        "bbox": list(line["bbox"]),
-                        "words": line_words
-                    })
-        print(f"[DEBUG Engine] Extracted {len(final_lines)} lines for page.")
+                block_text += line_text + " "
+                block_lines.append({
+                    "bbox": list(line["bbox"]),
+                    "text": line_text.strip()
+                })
+            
+            cleaned = self._clean_text(block_text)
+            if cleaned:
+                # Store the block with its internal lines for precise highlighting
+                final_blocks.append({
+                    "text": cleaned,
+                    "bbox": list(b["bbox"]),
+                    "lines": block_lines
+                })
+
+        # Merge blocks heuristic (natural paragraphs)
+        merged = []
+        if not final_blocks: return []
+        
+        curr = final_blocks[0]
+        for i in range(1, len(final_blocks)):
+            nxt = final_blocks[i]
+            dist = nxt["bbox"][1] - curr["bbox"][3]
+            
+            # If blocks are close vertically, merge them into one natural speech unit
+            if 0 <= dist < 12:
+                curr["text"] += " " + nxt["text"]
+                curr["lines"].extend(nxt["lines"])
+                curr["bbox"][0] = min(curr["bbox"][0], nxt["bbox"][0])
+                curr["bbox"][2] = max(curr["bbox"][2], nxt["bbox"][2])
+                curr["bbox"][3] = nxt["bbox"][3]
+            else:
+                merged.append(curr)
+                curr = nxt
+        merged.append(curr)
 
         # Filter headers/footers based on margin
         result = []
-        for item in final_lines:
+        for item in merged:
             y_mid = (item["bbox"][1] + item["bbox"][3]) / 2
             if margin == 0 or (content_top <= y_mid <= content_bottom):
                 result.append(item)
