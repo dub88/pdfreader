@@ -10,50 +10,85 @@ import darkdetect
 import time
 import re
 
+# High-Precision macOS Integration
+try:
+    from AppKit import NSView, NSVisualEffectView, NSVisualEffectBlendingModeBehindWindow, \
+                       NSVisualEffectMaterialSidebar, NSWindow, NSVisualEffectStateActive
+    import objc
+except ImportError:
+    pass
+
 class AudileApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        # THEME: Supa Colors Palette
-        self.ACCENT_PINK = "#E64D95"
-        self.ACCENT_BLUE = "#009CF5"
-        self.ACCENT_GREEN = "#52A800"
-        self.ACCENT_PURPLE = "#8776FF"
+        # --- 2026 "LIQUID MIDNIGHT" DESIGN SYSTEM ---
+        # Moving to a professional high-fidelity palette
+        self.CLR_BG = ("#F2F2F7", "#0A0A0A")
+        self.CLR_CARD = ("#FFFFFF", "#161617")
+        self.CLR_ACCENT = "#FF2D55"      # Apple Music Pink
+        self.CLR_ACCENT_ALT = "#5E5CE6"  # iOS Indigo
+        self.CLR_BORDER = ("#E5E5EA", "#2C2C2E")
+        self.CLR_TEXT_SEC = "#8E8E93"
         
-        self.title("Audile - Native macOS PDF Reader")
-        self.geometry("1100x750")
+        self.title("Audile - Professional PDF Reader")
+        self.geometry("1200x800")
+        
+        # Apply True macOS Vibrancy (Background Blur)
+        self._apply_native_vibrancy()
         
         # Initialize engines
         self.pdf_engine = None
         self.tts_engine = TTSEngine()
         
-        # State
+        # Application State
         self.config_file = os.path.expanduser("~/.audile_config.json")
         self.current_pdf_path = None
         self.current_page_blocks = []
         self.current_page_num = 1
         self.current_block_index = 0
-        
         self.is_playing = False
         self.is_loading = False
         self.current_page_rendered = -1
         self.zoom_factor = 1.0
         self.current_tk_img = None
         
-        # UI State
+        # Persistence State
         self.hidden_voice_ids = set()
         self.bookmarks = {} 
         self.library = {} 
         
-        # UI Setup
+        # UI Construction
         self._setup_ui()
         self._load_config()
         
-        # Bindings
+        # Bindings for Fluidity
         self.bind("<space>", lambda e: self._toggle_play())
         self.bind("<Left>", lambda e: self._prev_page())
         self.bind("<Right>", lambda e: self._next_page())
-        self.canvas.bind("<Configure>", lambda e: self.after(10, lambda: self._render_page(force=True)))
+
+    def _apply_native_vibrancy(self):
+        """Uses PyObjC to inject a native macOS blur view behind the window."""
+        try:
+            self.update()
+            view_id = self.winfo_id()
+            ns_view = objc.objc_object(c_void_p=view_id)
+            ns_window = ns_view.window()
+            
+            content_view = ns_window.contentView()
+            frame = content_view.bounds()
+            
+            blur_view = NSVisualEffectView.alloc().initWithFrame_(frame)
+            blur_view.setAutoresizingMask_(18) # width/height Sizable
+            blur_view.setMaterial_(NSVisualEffectMaterialSidebar)
+            blur_view.setBlendingMode_(NSVisualEffectBlendingModeBehindWindow)
+            blur_view.setState_(NSVisualEffectStateActive)
+            
+            content_view.addSubview_positioned_relativeTo_(blur_view, -1, None)
+            # Make the Tkinter frame see through to show the blur
+            self.configure(fg_color="transparent")
+        except Exception as e:
+            print(f"Native vibrancy skipped: {e}")
 
     def _setup_ui(self):
         ctk.set_appearance_mode("system")
@@ -62,157 +97,125 @@ class AudileApp(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        # --- SIDEBAR ---
-        self.sidebar = ctk.CTkFrame(self, width=280, corner_radius=0, fg_color=("#F2F2F7", "#1C1C1E"))
-        self.sidebar.grid(row=0, column=0, sticky="nsew")
+        # --- SIDEBAR (Editorial Style) ---
+        self.sidebar = ctk.CTkFrame(self, width=300, corner_radius=0, fg_color="transparent")
+        self.sidebar.grid(row=0, column=0, sticky="nsew", padx=(20, 0), pady=20)
         
-        self.logo_label = ctk.CTkLabel(self.sidebar, text="Audile", text_color=self.ACCENT_PINK,
-                                       font=ctk.CTkFont(family="SF Pro Display", size=36, weight="bold"))
-        self.version_label = ctk.CTkLabel(self.sidebar, text="Version 2.2 - DIAGNOSTIC", 
-                                        font=ctk.CTkFont(size=12, weight="bold"), text_color=self.ACCENT_PINK)
-        self.version_label.pack(padx=20, pady=(0, 10))
-        
-        # Diagnostic Log
-        self.debug_log = "/tmp/audile_debug.log"
-        with open(self.debug_log, "w") as f: f.write("Audile Debug Log Started\n")
+        self.logo_label = ctk.CTkLabel(self.sidebar, text="Audile", text_color=self.CLR_ACCENT,
+                                       font=ctk.CTkFont(family="SF Pro Display", size=42, weight="bold"))
+        self.logo_label.pack(anchor="w", padx=20, pady=(20, 30))
 
-        self.tabview = ctk.CTkTabview(self.sidebar, width=250, 
-                                      segmented_button_selected_color=self.ACCENT_PINK,
-                                      segmented_button_selected_hover_color=self.ACCENT_BLUE)
-        self.tabview.pack(padx=15, pady=10, expand=True, fill="both")
-        self.tabview.add("Library")
-        self.tabview.add("Playing")
-        self.tabview.add("Notes")
+        # Functional Tabview Switcher
+        self.nav_tab_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.nav_tab_frame.pack(fill="x", padx=10)
+
+        nav_opts = [("Library", "Library"), ("Controls", "Playing"), ("Notes", "Notes")]
+        self.nav_btns = {}
+        for label, target in nav_opts:
+            btn = ctk.CTkButton(self.nav_tab_frame, text=label, height=45, corner_radius=12,
+                                fg_color="transparent", text_color=("black", "white"),
+                                hover_color=self.CLR_BORDER, font=ctk.CTkFont(family="SF Pro Text", size=15, weight="bold"),
+                                command=lambda t=target: self._switch_nav(t))
+            btn.pack(pady=2, fill="x")
+            self.nav_btns[target] = btn
+
+        self.tabview = ctk.CTkTabview(self.sidebar, width=260, fg_color="transparent")
+        self.tabview._segmented_button.pack_forget() # Hide default buttons
+        self.tabview.pack(padx=0, pady=10, expand=True, fill="both")
         
+        self.lib_tab = self.tabview.add("Library")
+        self.play_tab = self.tabview.add("Playing")
+        self.notes_tab = self.tabview.add("Notes")
+
         # --- TAB: LIBRARY ---
-        self.lib_tab = self.tabview.tab("Library")
-        self.lib_add_btn = ctk.CTkButton(self.lib_tab, text="➕ Add Document", height=45, corner_radius=12, 
-                                         fg_color=self.ACCENT_PINK, hover_color=self.ACCENT_BLUE,
+        self.lib_add_btn = ctk.CTkButton(self.lib_tab, text="➕ Add Document", height=50, corner_radius=15, 
+                                         fg_color=self.CLR_ACCENT, hover_color=self.CLR_ACCENT_ALT,
                                          font=ctk.CTkFont(weight="bold"), command=self._open_file)
         self.lib_add_btn.pack(padx=10, pady=10, fill="x")
-        self.lib_scroll = ctk.CTkScrollableFrame(self.lib_tab, label_text="My Collection", fg_color="transparent")
+        
+        self.lib_scroll = ctk.CTkScrollableFrame(self.lib_tab, fg_color="transparent")
         self.lib_scroll.pack(padx=5, pady=5, expand=True, fill="both")
 
         # --- TAB: PLAYING ---
-        self.ctrl_tab = self.tabview.tab("Playing")
-        self.playback_pod = ctk.CTkFrame(self.ctrl_tab, fg_color=("#FFFFFF", "#2C2C2E"), corner_radius=18)
-        self.playback_pod.pack(padx=10, pady=10, fill="x")
+        self.voice_menu = ctk.CTkOptionMenu(self.play_tab, values=[], height=40, corner_radius=12, 
+                                            fg_color=self.CLR_CARD, button_color=self.CLR_BORDER,
+                                            dropdown_hover_color=self.CLR_ACCENT, command=self._on_voice_change)
+        self.voice_menu.pack(padx=10, pady=(20, 10), fill="x")
         
-        self.pod_label = ctk.CTkLabel(self.playback_pod, text="NOW PLAYING", font=ctk.CTkFont(size=10, weight="bold"), text_color="#8E8E93")
-        self.pod_label.pack(pady=(15, 0))
-
-        self.play_btn_frame = ctk.CTkFrame(self.playback_pod, fg_color="transparent")
-        self.play_btn_frame.pack(padx=15, pady=15, fill="x")
+        self.voice_btn_frame = ctk.CTkFrame(self.play_tab, fg_color="transparent")
+        self.voice_btn_frame.pack(fill="x", padx=10)
         
-        self.play_button = ctk.CTkButton(self.play_btn_frame, text="▶", width=60, height=60, 
-                                         corner_radius=30, fg_color=self.ACCENT_PINK, hover_color=self.ACCENT_BLUE,
-                                         font=ctk.CTkFont(size=20, weight="bold"), command=self._play)
-        self.play_button.pack(side="left", padx=(0, 10), expand=True, fill="x")
-        self.pause_button = ctk.CTkButton(self.play_btn_frame, text="⏸", width=60, height=60, corner_radius=30, command=self._pause)
-        self.pause_button.pack(side="left")
-
-        # Page Info & Navigation
-        self.nav_frame = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
-        self.nav_frame.pack(padx=10, pady=10, fill="x")
-        self.prev_page_btn = ctk.CTkButton(self.nav_frame, text="⏪", width=50, height=40, corner_radius=10, fg_color="transparent", border_width=1, text_color=("black", "white"), command=self._prev_page)
-        self.prev_page_btn.pack(side="left", padx=(0, 5))
-        self.page_info_label = ctk.CTkLabel(self.nav_frame, text="0 / 0", font=ctk.CTkFont(size=14, weight="bold"))
-        self.page_info_label.pack(side="left", expand=True)
-        self.next_page_btn = ctk.CTkButton(self.nav_frame, text="⏩", width=50, height=40, corner_radius=10, fg_color="transparent", border_width=1, text_color=("black", "white"), command=self._next_page)
-        self.next_page_btn.pack(side="left", padx=(5, 0))
-
-        # Speed Selector
-        self.speed_info_frame = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
-        self.speed_info_frame.pack(padx=10, pady=(15, 0), fill="x")
-        ctk.CTkLabel(self.speed_info_frame, text="Reading Speed", font=ctk.CTkFont(size=11, weight="bold"), text_color="#8E8E93").pack(side="left")
-        self.speed_value_label = ctk.CTkLabel(self.speed_info_frame, text="1.0x", font=ctk.CTkFont(size=11, weight="bold"), text_color=self.ACCENT_PINK).pack(side="right")
-        self.speed_slider = ctk.CTkSlider(self.ctrl_tab, from_=0.5, to=3.0, number_of_steps=25, button_color=self.ACCENT_PINK, command=self._on_speed_change)
-        self.speed_slider.set(1.0)
-        self.speed_slider.pack(padx=10, pady=10, fill="x")
-
-        # Voice Selector
-        self.voice_label = ctk.CTkLabel(self.ctrl_tab, text="NARRATOR", font=ctk.CTkFont(size=11, weight="bold"), text_color="#8E8E93")
-        self.voice_label.pack(padx=10, pady=(15, 5))
-        self.voice_menu = ctk.CTkOptionMenu(self.ctrl_tab, values=[], height=35, corner_radius=10, command=self._on_voice_change)
-        self.voice_menu.pack(padx=10, pady=5, fill="x")
+        self.preview_btn = ctk.CTkButton(self.voice_btn_frame, text="🔊 Preview", height=35, corner_radius=10, 
+                                         fg_color="transparent", border_width=1, text_color=("black", "white"),
+                                         command=self._preview_voice)
+        self.preview_btn.pack(side="left", expand=True, fill="x", padx=(0, 2))
         
-        self.voice_utils = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
-        self.voice_utils.pack(padx=10, pady=5, fill="x")
-        self.preview_btn = ctk.CTkButton(self.voice_utils, text="🔊 Preview", width=80, height=30, fg_color="transparent", border_width=1, text_color=("black", "white"), command=self._preview_voice)
-        self.preview_btn.pack(side="left", padx=(0, 2), expand=True, fill="x")
-        self.hide_voice_btn = ctk.CTkButton(self.voice_utils, text="👁 Hide", width=80, height=30, fg_color="transparent", border_width=1, text_color=("black", "white"), command=self._hide_current_voice)
-        self.hide_voice_btn.pack(side="left", padx=(2, 0), expand=True, fill="x")
+        self.hide_voice_btn = ctk.CTkButton(self.voice_btn_frame, text="👁 Hide", height=35, corner_radius=10, 
+                                            fg_color="transparent", border_width=1, text_color=("black", "white"),
+                                            command=self._hide_current_voice)
+        self.hide_voice_btn.pack(side="left", expand=True, fill="x", padx=(2, 0))
 
-        self.premium_only_switch = ctk.CTkSwitch(self.ctrl_tab, text="High Quality Only", progress_color=self.ACCENT_PINK, command=self._refresh_voice_list)
+        self.speed_slider = ctk.CTkSlider(self.play_tab, from_=0.5, to=3.0, button_color=self.CLR_ACCENT, 
+                                          progress_color=self.CLR_ACCENT, command=self._on_speed_change)
+        self.speed_slider.pack(padx=10, pady=30, fill="x")
+
+        self.premium_only_switch = ctk.CTkSwitch(self.play_tab, text="Premium Narrators Only", progress_color=self.CLR_ACCENT,
+                                                command=self._refresh_voice_list)
         self.premium_only_switch.select()
-        self.premium_only_switch.pack(padx=10, pady=15)
-
-        # Help / Reset at bottom
-        self.help_frame = ctk.CTkFrame(self.ctrl_tab, fg_color="transparent")
-        self.help_frame.pack(side="bottom", pady=10)
-        self.download_help_btn = ctk.CTkButton(self.help_frame, text="❓ Missing Voices?", height=20, font=ctk.CTkFont(size=10), fg_color="transparent", text_color=("black", "gray50"), command=self._show_voice_help)
-        self.download_help_btn.pack()
-        self.reset_voices_btn = ctk.CTkButton(self.help_frame, text="↺ Reset Hidden Voices", height=20, font=ctk.CTkFont(size=10), fg_color="transparent", text_color=("black", "gray50"), command=self._reset_hidden_voices)
-        self.reset_voices_btn.pack()
+        self.premium_only_switch.pack(padx=10, pady=10)
 
         # --- TAB: NOTES ---
-        self.bmk_tab = self.tabview.tab("Notes")
-        self.add_bmk_btn = ctk.CTkButton(self.bmk_tab, text="🔖 New Annotation", corner_radius=12, height=40, fg_color=self.ACCENT_PINK, command=self._add_bookmark)
+        self.add_bmk_btn = ctk.CTkButton(self.notes_tab, text="🔖 New Highlight", height=45, corner_radius=12,
+                                         fg_color=self.CLR_ACCENT, command=self._add_bookmark)
         self.add_bmk_btn.pack(padx=10, pady=10, fill="x")
-        self.bmk_scroll = ctk.CTkScrollableFrame(self.bmk_tab, label_text="Highlights", fg_color="transparent")
+        self.bmk_scroll = ctk.CTkScrollableFrame(self.notes_tab, fg_color="transparent")
         self.bmk_scroll.pack(padx=5, pady=5, expand=True, fill="both")
 
-        # --- MAIN CONTENT ---
-        self.content_frame = ctk.CTkFrame(self, corner_radius=20, fg_color=("#FFFFFF", "#121212"))
-        self.content_frame.grid(row=0, column=1, padx=25, pady=25, sticky="nsew")
-        self.content_frame.grid_columnconfigure(0, weight=1)
-        self.content_frame.grid_rowconfigure(0, weight=1)
+        # --- MAIN VIEWING CONTAINER ---
+        self.main_container = ctk.CTkFrame(self, corner_radius=32, fg_color=self.CLR_CARD, border_width=1, border_color=self.CLR_BORDER)
+        self.main_container.grid(row=0, column=1, padx=25, pady=25, sticky="nsew")
+        self.main_container.grid_columnconfigure(0, weight=1)
+        self.main_container.grid_rowconfigure(0, weight=1)
 
-        self.canvas_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
-        self.canvas_frame.grid(row=0, column=0, sticky="nsew")
-        self.canvas_frame.grid_columnconfigure(0, weight=1)
-        self.canvas_frame.grid_rowconfigure(0, weight=1)
-
-        self.canvas_bg = "#F2F2F7" if darkdetect.isLight() else "#1E1E1E"
-        self.canvas = tk.Canvas(self.canvas_frame, bg=self.canvas_bg, highlightthickness=0)
-        self.canvas.grid(row=0, column=0, sticky="nsew", padx=15, pady=15)
+        self.canvas = tk.Canvas(self.main_container, bg="#111112", highlightthickness=0)
+        self.canvas.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
         
-        # Bind MouseWheel for scrolling
+        # Interactions for Canvas
         self.canvas.bind("<MouseWheel>", self._on_mousewheel)
-        self.canvas.bind("<Button-4>", self._on_mousewheel) # Linux scroll up
-        self.canvas.bind("<Button-5>", self._on_mousewheel) # Linux scroll down
-        
-        # Bind pinch-to-zoom (macOS trackpad often maps to Control+MouseWheel)
         self.canvas.bind("<Control-MouseWheel>", self._on_pinch_zoom)
-        self.canvas.bind("<Option-MouseWheel>", self._on_pinch_zoom)
 
-        self.v_scrollbar = ctk.CTkScrollbar(self.canvas_frame, orientation="vertical", command=self.canvas.yview)
-        self.v_scrollbar.grid(row=0, column=1, sticky="ns", pady=15)
-        self.h_scrollbar = ctk.CTkScrollbar(self.canvas_frame, orientation="horizontal", command=self.canvas.xview)
-        self.h_scrollbar.grid(row=1, column=0, sticky="ew", padx=15)
-        self.canvas.configure(yscrollcommand=self.v_scrollbar.set, xscrollcommand=self.h_scrollbar.set)
+        # --- THE "DYNAMIC ISLAND" PLAYBACK POD ---
+        self.island = ctk.CTkFrame(self.main_container, height=80, corner_radius=40, 
+                                   fg_color=("#FDFDFD", "#1D1D1F"), border_width=1, border_color=self.CLR_BORDER)
+        self.island.place(relx=0.5, rely=0.92, anchor="center", relwidth=0.6)
+        
+        self.play_btn = ctk.CTkButton(self.island, text="▶", width=54, height=54, corner_radius=27, 
+                                      fg_color=self.CLR_ACCENT, hover_color=self.CLR_ACCENT_ALT,
+                                      font=ctk.CTkFont(size=22), command=self._play)
+        self.play_btn.pack(side="left", padx=13)
 
-        self.progress_bar = ctk.CTkProgressBar(self.content_frame, height=8, corner_radius=4, progress_color=self.ACCENT_PINK)
-        self.progress_bar.grid(row=1, column=0, padx=30, pady=(0, 25), sticky="ew")
+        self.page_lbl = ctk.CTkLabel(self.island, text="Audile Pro", font=ctk.CTkFont(family="SF Pro Display", size=15, weight="bold"))
+        self.page_lbl.pack(side="left", padx=10, expand=True)
+
+        self.prev_btn = ctk.CTkButton(self.island, text="⏪", width=44, height=44, corner_radius=22, fg_color="transparent", command=self._prev_page)
+        self.prev_btn.pack(side="right", padx=5)
+        
+        self.next_btn = ctk.CTkButton(self.island, text="⏩", width=44, height=44, corner_radius=22, fg_color="transparent", command=self._next_page)
+        self.next_btn.pack(side="right", padx=(5, 13))
+
+        # Overall Progress Bar (Hidden Slim line at the very top of main frame)
+        self.progress_bar = ctk.CTkProgressBar(self.main_container, height=3, progress_color=self.CLR_ACCENT, fg_color="transparent")
+        self.progress_bar.grid(row=0, column=0, sticky="new", padx=40, pady=(15, 0))
         self.progress_bar.set(0)
 
-        # Status label moved to sidebar under logo
+        self._refresh_voice_list()
+        self._switch_nav("Library")
 
-    def _on_mousewheel(self, event):
-        """Standard scroll for mouse and trackpad."""
-        if event.num == 4 or event.delta > 0:
-            self.canvas.yview_scroll(-1, "units")
-        elif event.num == 5 or event.delta < 0:
-            self.canvas.yview_scroll(1, "units")
-
-    def _on_pinch_zoom(self, event):
-        """Approximate zoom for macOS trackpad pinch."""
-        if event.delta > 0:
-            self.zoom_factor *= 1.1
-        else:
-            self.zoom_factor *= 0.9
-        self.zoom_factor = max(0.5, min(5.0, self.zoom_factor))
-        self._render_page(force=True)
+    def _switch_nav(self, target):
+        self.tabview.set(target)
+        for t, btn in self.nav_btns.items():
+            btn.configure(fg_color=self.CLR_ACCENT if t == target else "transparent",
+                          text_color="white" if t == target else ("black", "white"))
 
     def _open_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("PDF Files", "*.pdf")])
@@ -222,21 +225,25 @@ class AudileApp(ctk.CTk):
     def _select_doc_type(self, file_path):
         dialog = ctk.CTkToplevel(self)
         dialog.title("Import Document")
-        dialog.geometry("300x250")
+        dialog.geometry("340x320")
+        dialog.configure(fg_color=self.CLR_BG[1] if darkdetect.isDark() else self.CLR_BG[0])
         dialog.grab_set()
-        ctk.CTkLabel(dialog, text="Select Document Type", font=ctk.CTkFont(weight="bold")).pack(pady=20)
-        def set_and_load(val):
-            dialog.destroy()
-            self._load_pdf(file_path, val)
-        ctk.CTkButton(dialog, text="📖 Book", command=lambda: set_and_load("Book")).pack(pady=5, padx=20, fill="x")
-        ctk.CTkButton(dialog, text="🔬 Research Paper", command=lambda: set_and_load("Research")).pack(pady=5, padx=20, fill="x")
-        ctk.CTkButton(dialog, text="📑 Standard Document", command=lambda: set_and_load("Standard")).pack(pady=5, padx=20, fill="x")
+        
+        ctk.CTkLabel(dialog, text="Optimize Reading For:", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=25)
+        
+        opts = [("📖  Literary Book", "Book"), ("🔬  Research Paper", "Research"), ("📑  Standard Document", "Standard")]
+        for label, val in opts:
+            btn = ctk.CTkButton(dialog, text=label, height=55, corner_radius=18, 
+                                fg_color=self.CLR_CARD[1] if darkdetect.isDark() else self.CLR_CARD[0], 
+                                border_width=1, border_color=self.CLR_BORDER[1] if darkdetect.isDark() else self.CLR_BORDER[0],
+                                hover_color=self.CLR_ACCENT, command=lambda v=val: [dialog.destroy(), self._load_pdf(file_path, v)])
+            btn.pack(pady=6, padx=35, fill="x")
 
     def _load_pdf(self, file_path, doc_type="Book"):
         if self.is_loading: return
         self._stop() 
-        self.version_label.configure(text=f"Syncing: {os.path.basename(file_path)}...")
         self.is_loading = True
+        
         def extract():
             try:
                 engine = PDFEngine(file_path)
@@ -245,9 +252,9 @@ class AudileApp(ctk.CTk):
                     self.current_pdf_path = file_path
                     self.after(0, lambda: self._on_pdf_loaded(doc_type))
                 else:
-                    self.after(0, lambda: messagebox.showerror("Error", "Could not open PDF file."))
+                    self.after(0, lambda: messagebox.showerror("Error", "Unsupported PDF format."))
             except Exception as e:
-                self.after(0, lambda: messagebox.showerror("Error", f"Failed to load PDF: {e}"))
+                self.after(0, lambda: messagebox.showerror("Error", f"Failed: {e}"))
             finally:
                 self.is_loading = False
         threading.Thread(target=extract, daemon=True).start()
@@ -255,22 +262,23 @@ class AudileApp(ctk.CTk):
     def _on_pdf_loaded(self, doc_type):
         if self.current_pdf_path not in self.library:
             self.library[self.current_pdf_path] = {"page": 1, "title": os.path.basename(self.current_pdf_path), "doc_type": doc_type}
+        
         self.current_page_num = self.library[self.current_pdf_path].get("page", 1)
-        self.version_label.configure(text=f"Ready: {self.library[self.current_pdf_path]['title']}")
         self._load_page_data(self.current_page_num)
-        self._refresh_bookmark_list()
         self._refresh_library_list()
+        self._refresh_bookmark_list()
         self._save_config()
+        self._switch_nav("Playing")
 
     def _load_page_data(self, page_num):
         self.current_page_num = page_num
         if self.current_pdf_path in self.library:
             self.library[self.current_pdf_path]["page"] = page_num
+        
         doc_type = self.library[self.current_pdf_path].get("doc_type", "Book")
         self.current_page_blocks = self.pdf_engine.get_page_data(page_num, doc_type=doc_type)
         self.current_block_index = 0
-        if self.page_info_label:
-            self.page_info_label.configure(text=f"{page_num} / {self.pdf_engine.total_pages}")
+        self.page_lbl.configure(text=f"Page {page_num} / {self.pdf_engine.total_pages}")
         self._render_page()
 
     def _render_page(self, force=False):
@@ -279,7 +287,8 @@ class AudileApp(ctk.CTk):
         canvas_width = self.canvas.winfo_width()
         if canvas_width > 50:
             orig_w, _ = self.pdf_engine.get_page_size(self.current_page_num)
-            if orig_w: self.zoom_factor = (canvas_width - 60) / orig_w
+            if orig_w: self.zoom_factor = (canvas_width - 100) / orig_w
+        
         if self.current_page_num != self.current_page_rendered or force or self.current_tk_img is None:
             from PIL import ImageTk
             self.current_img = self.pdf_engine.get_page_image(self.current_page_num, zoom=self.zoom_factor)
@@ -287,100 +296,42 @@ class AudileApp(ctk.CTk):
             self.current_tk_img = ImageTk.PhotoImage(self.current_img)
             self.canvas.delete("all")
             img_w, img_h = self.current_tk_img.width(), self.current_tk_img.height()
-            x_off = max(30, (canvas_width - img_w) // 2)
-            self.canvas.create_image(x_off, 30, anchor="nw", image=self.current_tk_img, tags="page")
-            border_color = "#CCCCCC" if darkdetect.isLight() else "#333333"
-            self.canvas.create_rectangle(x_off-1, 29, x_off+img_w+1, img_h+31, outline=border_color, tags="border")
-            self.canvas.config(scrollregion=(0, 0, max(canvas_width, img_w + x_off*2), img_h + 80))
+            x_off = max(50, (canvas_width - img_w) // 2)
+            self.canvas.create_image(x_off, 50, anchor="nw", image=self.current_tk_img, tags="page")
+            self.canvas.config(scrollregion=(0, 0, max(canvas_width, img_w + x_off*2), img_h + 150))
             self.current_page_rendered = self.current_page_num
 
-    def _log(self, msg):
-        try:
-            with open(self.debug_log, "a") as f: f.write(f"{time.strftime('%H:%M:%S')} - {msg}\n")
-        except: pass
+        self._highlight_current_block()
+        self.progress_bar.set(self.current_page_num / self.pdf_engine.total_pages)
 
-    def _poll_tts_queue(self):
-        """Pick up real-time speech coordinates from the queue and highlight accordingly."""
-        if not self.is_playing: return
-            
-        location, length = None, None
-        try:
-            while not self.tts_engine.queue.empty():
-                loc, l = self.tts_engine.queue.get_nowait()
-                location, length = loc, l
-        except: pass
-
-        if location is not None:
-            self._log(f"Sync Packet: {location}")
-            self._highlight_speech_range(location, length)
-        elif self.tts_engine.is_speaking():
-            # Fallback for when sync data is missing
-            if not self.canvas.find_withtag("highlight"):
-                self._log("Fallback: Highlight First Line")
-                self._highlight_speech_range(0, 1)
-        else:
-            self._log("Engine Not Speaking")
-            
-        self.after(50, self._poll_tts_queue)
-
-    def _highlight_speech_range(self, location, length):
-        """Map a character range to a specific line and highlight it."""
-        if not self.current_page_blocks or self.current_block_index >= len(self.current_page_blocks):
-            return
-            
-        block = self.current_page_blocks[self.current_block_index]
-        if "lines" not in block: return
+    def _on_word_spoken(self, location, length):
+        """Fluid word-level highlight via estimation (GIL-Safe)."""
+        if not self.is_playing or not self.current_page_blocks: return
+        if self.current_block_index >= len(self.current_page_blocks): return
         
-        # We MUST use the same phonetic logic as speak() to match lengths
-        curr_spoken_len = 0
-        target_line = None
-        for line in block["lines"]:
-            spoken_line = self._fix_years(line["text"])
-            l_len = len(spoken_line) + 1 # +1 for space between lines
-            if curr_spoken_len <= location < curr_spoken_len + l_len:
-                target_line = line
-                break
-            curr_spoken_len += l_len
-            
-        if target_line:
-            self._draw_line_highlight(target_line["bbox"])
-        else:
-            # Fallback to first line if we are confused
-            if block["lines"]:
-                self._draw_line_highlight(block["lines"][0]["bbox"])
+        block = self.current_page_blocks[self.current_block_index]
+        if not block.get("words"): return
+        
+        # Word selection logic based on character location
+        total_chars = len(block["text"])
+        if total_chars == 0: return
+        
+        progress = location / total_chars
+        word_idx = int(progress * len(block["words"]))
+        word_idx = max(0, min(word_idx, len(block["words"]) - 1))
+        
+        self._highlight_word(block["words"][word_idx]["bbox"])
 
-    def _draw_line_highlight(self, bbox):
-        self.canvas.delete("highlight")
-        z = self.zoom_factor
+    def _highlight_word(self, bbox):
+        self.canvas.delete("word_highlight")
         coords = self.canvas.coords("page")
         if not coords: return
-        x_off, y_off = coords[0], coords[1]
+        x_off, y_off, z = coords[0], coords[1], self.zoom_factor
         
-        # --- LOCALIZED UNDERLINE (Perfect Sync) ---
-        # Height: from y0 to y1. Position: under the line text.
-        self.canvas.create_rectangle(bbox[0]*z + x_off, bbox[3]*z + y_off - 1, 
+        # Apple Music Style Pill-Highlight (Underline + Subtle Glow)
+        self.canvas.create_rectangle(bbox[0]*z + x_off, bbox[3]*z + y_off - 3, 
                                    bbox[2]*z + x_off, bbox[3]*z + y_off + 1, 
-                                   fill=self.ACCENT_PINK, outline="", tags="highlight")
-                                   
-        self._scroll_to_highlight(bbox[1]*z + y_off, bbox[3]*z + y_off)
-
-    def _animate_highlight(self, start_time, total_chars, lines):
-        pass
-
-    def _highlight_line(self, bbox):
-        pass
-
-    def _highlight_current_block(self):
-        pass
-
-    def _scroll_to_highlight(self, hy0, hy1):
-        if not self.current_tk_img: return
-        img_h = self.current_tk_img.height() + 60
-        view_h = self.canvas.winfo_height()
-        if view_h <= 1: return
-        v_start, v_end = self.canvas.yview()
-        if hy0 < v_start * img_h + 60 or hy1 > v_end * img_h - 60:
-            self.canvas.yview_moveto(max(0, min(1.0, (hy0 - view_h/3) / img_h)))
+                                   fill=self.CLR_ACCENT, outline="", tags="word_highlight")
 
     def _play(self):
         if not self.current_page_blocks: return
@@ -388,31 +339,17 @@ class AudileApp(ctk.CTk):
             self._stop()
             return
         self.is_playing = True
-        self.play_button.configure(text="■")
+        self.play_btn.configure(text="■")
         self._speak_current_block()
 
     def _speak_current_block(self):
         if not self.is_playing: return
         if self.current_block_index < len(self.current_page_blocks):
             block = self.current_page_blocks[self.current_block_index]
-            # Phonetic fix for years
-            txt = self._fix_years(block["text"])
-            self.tts_engine.speak(txt)
-            # Start the sync polling loop
-            self._poll_tts_queue()
+            self.tts_engine.speak(block["text"])
             self.after(100, self._check_speech_status)
         else:
             self._on_page_finished()
-
-    def _fix_years(self, text: str) -> str:
-        def year_repl(match):
-            year = match.group(0)
-            y_int = int(year)
-            if 1800 <= y_int <= 2099:
-                if 2000 <= y_int <= 2009: return f"two thousand {y_int % 100 if y_int % 100 > 0 else ''}"
-                else: return f"{year[:2]} {year[2:]}"
-            return year
-        return re.sub(r'\b\d{4}\b', year_repl, text)
 
     def _check_speech_status(self):
         if not self.is_playing: return
@@ -433,17 +370,14 @@ class AudileApp(ctk.CTk):
             self.after(600, self._speak_current_block)
         else:
             self._stop()
-            self.version_label.configure(text="Finished")
+            self.status_label.configure(text="Finished Session")
 
-    def _pause(self): 
-        self.tts_engine.pause()
-        self.play_button.configure(text="▶")
-    
+    def _pause(self): self.tts_engine.pause()
     def _stop(self):
         self.is_playing = False
-        self.play_button.configure(text="▶")
+        self.play_btn.configure(text="▶")
         self.tts_engine.stop()
-        self.canvas.delete("highlight")
+        self.canvas.delete("word_highlight")
 
     def _toggle_play(self):
         if self.is_playing and not self.tts_engine.is_paused: self._pause()
@@ -459,113 +393,93 @@ class AudileApp(ctk.CTk):
         self.current_page_num = min(self.pdf_engine.total_pages, self.current_page_num + 1)
         self._load_page_data(self.current_page_num)
 
-    def _on_speed_change(self, v):
-        self.speed_value_label.configure(text=f"{v:.1f}x")
-        self.tts_engine.set_rate(v)
+    def _on_mousewheel(self, event):
+        self.canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
 
-    def _on_voice_change(self, display_name):
-        for i, dn in enumerate(self.voice_display_names):
-            if dn == display_name:
-                self.tts_engine.set_voice(self.voices[i]['id'])
-                break
+    def _on_pinch_zoom(self, event):
+        if event.delta > 0: self.zoom_factor *= 1.1
+        else: self.zoom_factor *= 0.9
+        self.zoom_factor = max(0.5, min(5.0, self.zoom_factor))
+        self._render_page(force=True)
 
-    def _preview_voice(self):
-        current = self.voice_menu.get()
-        if not current: return
-        for i, dn in enumerate(self.voice_display_names):
-            if dn == current:
-                self.tts_engine.preview(self.voices[i]['id'])
-                break
+    def _on_speed_change(self, v): self.tts_engine.set_rate(v)
+    def _on_voice_change(self, dn):
+        for v in self.voices:
+            if dn.startswith(v['name']): self.tts_engine.set_voice(v['id']); break
 
     def _refresh_library_list(self):
         for widget in self.lib_scroll.winfo_children(): widget.destroy()
         if not self.library:
-            ctk.CTkLabel(self.lib_scroll, text="Library empty.", font=ctk.CTkFont(slant="italic")).pack(pady=30)
+            ctk.CTkLabel(self.lib_scroll, text="Collection is empty", font=ctk.CTkFont(slant="italic")).pack(pady=40)
             return
         for path, info in self.library.items():
             if not os.path.exists(path): continue
             frame = ctk.CTkFrame(self.lib_scroll, fg_color="transparent")
-            frame.pack(fill="x", pady=4, padx=5)
+            frame.pack(fill="x", pady=5, padx=10)
             is_active = (path == self.current_pdf_path)
-            btn = ctk.CTkButton(frame, text=f"{info['title']}\nPage {info['page']}", anchor="w", height=70, corner_radius=15,
-                               fg_color=(self.ACCENT_PINK) if is_active else ("#E5E5EA", "#2C2C2E"),
-                               text_color="white" if is_active else ("black", "white"),
-                               command=lambda p=path: self._load_pdf(p, info.get('doc_type', 'Book')))
-            btn.pack(side="left", fill="x", expand=True, padx=(0, 5))
             
-            # Trash / Delete Button
-            del_btn = ctk.CTkButton(frame, text="🗑", width=35, height=70, corner_radius=15,
-                                   fg_color="transparent", border_width=1, border_color="#FA2D48",
-                                   text_color="#FA2D48", hover_color=("#FA2D48", "#450A0A"),
-                                   command=lambda p=path: self._confirm_remove_from_library(p))
+            btn = ctk.CTkButton(frame, text=f"• {info['title']}", anchor="w", height=65, corner_radius=15,
+                               fg_color=self.CLR_BORDER[1] if is_active else "transparent",
+                               text_color=self.CLR_ACCENT if is_active else "white",
+                               font=ctk.CTkFont(size=14, weight="bold" if is_active else "normal"),
+                               command=lambda p=path: self._load_pdf(p))
+            btn.pack(side="left", fill="x", expand=True, padx=(0, 10))
+            
+            del_btn = ctk.CTkButton(frame, text="🗑", width=40, height=40, corner_radius=20, fg_color="transparent", 
+                                   text_color=self.CLR_TEXT_SEC, hover_color="#FF3B30",
+                                   command=lambda p=path: self._confirm_remove(p))
             del_btn.pack(side="right")
 
-    def _confirm_remove_from_library(self, path):
-        """Warning before deletion to prevent data loss."""
-        title = self.library[path]['title']
-        msg = f"Are you sure you want to remove '{title}' from your library?\n\nYou will lose all bookmarks and notes for this document."
-        if messagebox.askyesno("Remove Document", msg):
-            self._remove_from_library(path)
-
-    def _remove_from_library(self, path):
-        if path in self.library:
+    def _confirm_remove(self, path):
+        if messagebox.askyesno("Audile Pro", "Permanently remove this document?\n\nHighlights and library progress will be lost."):
             del self.library[path]
+            if path == self.current_pdf_path:
+                self.current_pdf_path = None
+                self.canvas.delete("all")
             self._refresh_library_list()
             self._save_config()
 
-    def _hide_current_voice(self):
-        current = self.voice_menu.get()
-        if not current: return
-        for i, dn in enumerate(self.voice_display_names):
-            if dn == current:
-                self.hidden_voice_ids.add(self.voices[i]['id'])
-                break
-        self._refresh_voice_list()
-        self._save_config()
-
-    def _reset_hidden_voices(self):
-        self.hidden_voice_ids.clear()
-        self._refresh_voice_list()
-        self._save_config()
-
-    def _show_voice_help(self):
-        messagebox.showinfo("Audile Help", "Download Enhanced voices in System Settings > Accessibility > Spoken Content.")
-
     def _refresh_voice_list(self):
-        raw_voices = self.tts_engine.get_voices()
+        raw = self.tts_engine.get_voices()
         premium_only = self.premium_only_switch.get() == 1
         voice_map = {}
-        for v in raw_voices:
+        for v in raw:
             if v['id'] in self.hidden_voice_ids or v['is_novelty']: continue
             if premium_only and not v['is_premium']: continue
             key = (v['name'], v['lang'])
             if key not in voice_map or v['quality_val'] > voice_map[key]['quality_val']: voice_map[key] = v
         self.voices = sorted(list(voice_map.values()), key=lambda v: (not v.get('is_personal', False), -v['quality_val'], v['name']))
-        self.voice_display_names = [f"{v['name']} ({v['lang']}) {'👤' if v.get('is_personal') else '💎' if v['quality_val']==3 else '★' if v['quality_val']==2 else ''}" for v in self.voices]
-        if self.voice_menu:
-            self.voice_menu.configure(values=self.voice_display_names)
-            if self.voice_display_names and self.voice_menu.get() not in self.voice_display_names:
-                self.voice_menu.set(self.voice_display_names[0])
-                self._on_voice_change(self.voice_display_names[0])
+        self.voice_display_names = [f"{v['name']}  {'👤' if v.get('is_personal') else '✨' if v['quality_val']==3 else '★' if v['quality_val']==2 else ''}" for v in self.voices]
+        if self.voice_menu: self.voice_menu.configure(values=self.voice_display_names)
 
     def _add_bookmark(self):
         if not self.current_pdf_path: return
-        note = ctk.CTkInputDialog(text="Annotation:", title="Notes").get_input()
-        if note is None: return
-        if self.current_pdf_path not in self.bookmarks: self.bookmarks[self.current_pdf_path] = []
-        self.bookmarks[self.current_pdf_path].append({"page": self.current_page_num, "note": note or f"P{self.current_page_num}", "timestamp": time.time()})
-        self._refresh_bookmark_list()
-        self._save_config()
+        note = ctk.CTkInputDialog(text="Personal Annotation:", title="Add Note").get_input()
+        if note:
+            if self.current_pdf_path not in self.bookmarks: self.bookmarks[self.current_pdf_path] = []
+            self.bookmarks[self.current_pdf_path].append({"page": self.current_page_num, "note": note, "timestamp": time.time()})
+            self._refresh_bookmark_list()
+            self._save_config()
 
     def _refresh_bookmark_list(self):
         for widget in self.bmk_scroll.winfo_children(): widget.destroy()
-        if not self.current_pdf_path or self.current_pdf_path not in self.bookmarks:
-            ctk.CTkLabel(self.bmk_scroll, text="No notes.", font=ctk.CTkFont(slant="italic")).pack(pady=30)
-            return
+        if not self.current_pdf_path or self.current_pdf_path not in self.bookmarks: return
         for b in sorted(self.bookmarks[self.current_pdf_path], key=lambda x: x['page']):
-            frame = ctk.CTkFrame(self.bmk_scroll, fg_color=("#E5E5EA", "#2C2C2E"), corner_radius=12)
-            frame.pack(fill="x", pady=4, padx=5)
-            ctk.CTkButton(frame, text=f"P{b['page']}: {b['note'][:25]}", anchor="w", height=40, fg_color="transparent", text_color=("#000000", "#FFFFFF"), command=lambda p=b['page']: self._jump_to_page(p)).pack(side="left", fill="x", expand=True, padx=5)
+            btn = ctk.CTkButton(self.bmk_scroll, text=f"P{b['page']}: {b['note']}", anchor="w", height=45, corner_radius=15,
+                               fg_color=self.CLR_BORDER[1], text_color="white", command=lambda p=b['page']: self._load_page_data(p))
+            btn.pack(fill="x", pady=3, padx=10)
+
+    def _preview_voice(self):
+        current = self.voice_menu.get()
+        for v in self.voices:
+            if current.startswith(v['name']): self.tts_engine.preview(v['id']); break
+    def _hide_current_voice(self):
+        current = self.voice_menu.get()
+        for v in self.voices:
+            if current.startswith(v['name']): self.hidden_voice_ids.add(v['id']); break
+        self._refresh_voice_list(); self._save_config()
+    def _reset_hidden_voices(self): self.hidden_voice_ids.clear(); self._refresh_voice_list(); self._save_config()
+    def _show_voice_help(self): messagebox.showinfo("Voices", "Install 'Enhanced' voices in System Settings > Accessibility > Spoken Content.")
 
     def _load_config(self):
         if os.path.exists(self.config_file):
@@ -576,8 +490,7 @@ class AudileApp(ctk.CTk):
                     self.bookmarks = config.get("bookmarks", {})
                     self.library = config.get("library", {})
                     self._refresh_voice_list()
-                    if config.get("last_pdf") and os.path.exists(config["last_pdf"]): 
-                        self._load_pdf(config["last_pdf"], self.library.get(config["last_pdf"], {}).get('doc_type', 'Book'))
+                    if config.get("last_pdf") and os.path.exists(config["last_pdf"]): self._load_pdf(config["last_pdf"])
             except: pass
 
     def _save_config(self):

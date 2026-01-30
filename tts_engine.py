@@ -8,43 +8,23 @@ import time
 import os
 import re
 from typing import List, Dict
-import queue
-import objc
-from Foundation import NSObject
-
-class TTSDelegate(NSObject):
-    def initWithQueue_(self, q):
-        self = objc.super(TTSDelegate, self).init()
-        if self:
-            self._queue = q
-        return self
-
-    @objc.signature(b'v@:@{_NSRange=QQ}@')
-    def speechSynthesizer_willSpeakRangeOfSpeechString_utterance_(self, synth, char_range, utterance):
-        # DEBUG: See if we are even receiving packets from the OS
-        print(f"[DEBUG DELEGATE] Range: {char_range.location}, {char_range.length}")
-        if hasattr(self, "_queue"):
-            self._queue.put((char_range.location, char_range.length))
 
 class TTSEngine:
     def __init__(self):
-        # Using native macOS speech engine
+        # Using modern AVFoundation for high-quality macOS voices
         self._synth = AVSpeechSynthesizer.alloc().init()
-        self.queue = queue.Queue()
-        self._delegate = TTSDelegate.alloc().initWithQueue_(self.queue)
-        self._synth.setDelegate_(self._delegate)
         self._voice = None
         self._rate = 0.5 
         self._volume = 1.0
         self.is_paused = False
 
     def get_voices(self) -> List[Dict]:
-        """Returns a list of available macOS voices with metadata."""
+        """Returns a list of available macOS voices with metadata, filtered for quality."""
         voices = AVSpeechSynthesisVoice.speechVoices()
         results = []
         qualities = {1: "Standard", 2: "Enhanced", 3: "Premium"}
         
-        # Novelty/Creepy voices (Legacy Mac voices) to be hidden
+        # Purge creepy/legacy novelty voices from 1990s macOS
         creepy_keywords = {
             "albert", "badnews", "bahh", "bells", "boing", "bubbles", "cellos", 
             "deranged", "goodnews", "hysterical", "junior", "organ", "princess", 
@@ -61,7 +41,7 @@ class TTSEngine:
             is_novelty = any(x in v_id for x in creepy_keywords) or any(x in name.lower() for x in ["bad news", "good news", "pipe organ", "jester", "wobble", "superstar"])
             is_compact = "compact" in v_id
             
-            # High-Quality detection fallback for Sequoia
+            # Smart high-quality detection for Sequoia (where quality_num is often buggy)
             is_premium = (quality_num >= 2 or is_personal or ("compact" not in v_id and not is_novelty))
 
             results.append({
@@ -80,18 +60,33 @@ class TTSEngine:
         self._voice = AVSpeechSynthesisVoice.voiceWithIdentifier_(voice_id)
 
     def set_rate(self, rate: float):
-        # Map 0.5x-3.0x to AVFoundation's 0.0-1.0
+        # Map user 0.5x-3.0x to AVFoundation 0.0-1.0
         new_rate = 0.2 + (rate * 0.3)
         self._rate = max(0.0, min(1.0, new_rate))
 
     def speak(self, text: str):
         self.is_paused = False
-        utterance = AVSpeechUtterance.speechUtteranceWithString_(text)
+        # Pre-process years for natural narration (e.g. 1975 -> nineteen seventy-five)
+        processed_text = self._fix_years(text)
+        utterance = AVSpeechUtterance.speechUtteranceWithString_(processed_text)
         if self._voice:
             utterance.setVoice_(self._voice)
         utterance.setRate_(self._rate)
         utterance.setVolume_(self._volume)
         self._synth.speakUtterance_(utterance)
+
+    def _fix_years(self, text: str) -> str:
+        """Heuristic to make years sound natural."""
+        def year_repl(match):
+            year = match.group(0)
+            y_int = int(year)
+            if 1800 <= y_int <= 2099:
+                if 2000 <= y_int <= 2009:
+                    return f"two thousand {y_int % 100 if y_int % 100 > 0 else ''}"
+                else:
+                    return f"{year[:2]} {year[2:]}"
+            return year
+        return re.sub(r'\b\d{4}\b', year_repl, text)
 
     def is_speaking(self) -> bool:
         return self._synth.isSpeaking()
@@ -109,7 +104,9 @@ class TTSEngine:
         self._synth.stopSpeakingAtBoundary_(AVSpeechBoundaryImmediate)
 
     def preview(self, voice_id: str):
-        old_voice = self._voice
+        """Play a short test sentence in a specific voice."""
+        self.stop()
+        orig_voice = self._voice
         self.set_voice(voice_id)
-        self.speak("Hello, this is my high-quality voice.")
-        self._voice = old_voice
+        self.speak("This is a preview of my high-fidelity narration voice.")
+        self._voice = orig_voice
