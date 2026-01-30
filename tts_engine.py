@@ -4,15 +4,14 @@ from AVFoundation import (
     AVSpeechSynthesisVoice,
     AVSpeechBoundaryImmediate
 )
-from Foundation import NSObject
 import time
 import os
 import re
-import objc
-from typing import List, Dict, Callable
+from typing import List, Dict
 
 class TTSEngine:
     def __init__(self):
+        # Using native macOS speech engine
         self._synth = AVSpeechSynthesizer.alloc().init()
         self._voice = None
         self._rate = 0.5 
@@ -24,6 +23,8 @@ class TTSEngine:
         voices = AVSpeechSynthesisVoice.speechVoices()
         results = []
         qualities = {1: "Standard", 2: "Enhanced", 3: "Premium"}
+        
+        # Novelty/Creepy voices (Legacy Mac voices) to be hidden
         creepy_keywords = {
             "albert", "badnews", "bahh", "bells", "boing", "bubbles", "cellos", 
             "deranged", "goodnews", "hysterical", "junior", "organ", "princess", 
@@ -35,9 +36,12 @@ class TTSEngine:
             v_id = v.identifier().lower()
             lang = v.language()
             quality_num = v.quality()
+            
             is_personal = "personalvoice" in v_id or "personal" in name.lower()
             is_novelty = any(x in v_id for x in creepy_keywords) or any(x in name.lower() for x in ["bad news", "good news", "pipe organ", "jester", "wobble", "superstar"])
             is_compact = "compact" in v_id
+            
+            # High-Quality detection fallback for Sequoia
             is_premium = (quality_num >= 2 or is_personal or ("compact" not in v_id and not is_novelty))
 
             results.append({
@@ -52,14 +56,11 @@ class TTSEngine:
             })
         return results
 
-    def preview(self, voice_id: str):
-        self.stop()
-        self.speak("Hello, this is your high-quality narrator.")
-
     def set_voice(self, voice_id: str):
         self._voice = AVSpeechSynthesisVoice.voiceWithIdentifier_(voice_id)
 
     def set_rate(self, rate: float):
+        # Map 0.5x-3.0x to AVFoundation's 0.0-1.0
         new_rate = 0.2 + (rate * 0.3)
         self._rate = max(0.0, min(1.0, new_rate))
 
@@ -86,3 +87,9 @@ class TTSEngine:
     def stop(self):
         self.is_paused = False
         self._synth.stopSpeakingAtBoundary_(AVSpeechBoundaryImmediate)
+
+    def preview(self, voice_id: str):
+        old_voice = self._voice
+        self.set_voice(voice_id)
+        self.speak("Hello, this is my high-quality voice.")
+        self._voice = old_voice
