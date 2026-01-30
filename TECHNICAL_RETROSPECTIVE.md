@@ -77,3 +77,29 @@ Initially attempted word-level estimation, but transitioned to a stable **Line F
 Integrated `Audile-icon.png` as the official application icon.
 **Process:**
 Converted the high-resolution PNG to a multi-size `.icns` bundle using macOS `sips` and `iconutil` tools to ensure crisp rendering across all macOS display scales (Retina/Standard). Updated the PyInstaller build specification to include the `--icon` flag pointing to the generated `.icns` file.
+
+### 8. CTkProgressBar Transparency Crash (Jan 29, 2026)
+**Issue:**
+`ValueError: transparency is not allowed for this attribute` on startup.
+**Context:**
+Occurred when initializing `CTkProgressBar` in `main.py`.
+**Cause:**
+The `fg_color="transparent"` property is not supported by `CTkProgressBar`. Unlike `CTkFrame`, progress bars require a solid background color.
+**Resolution:**
+Changed `fg_color` to a valid color tuple `("#E5E5EA", "#3A3A3C")` for light/dark mode.
+
+### 9. status_label Reference Error (Jan 30, 2026)
+**Issue:**
+`AttributeError: 'AudileApp' object has no attribute 'status_label'` when playback finished.
+**Context:**
+Occurred in `_on_page_finished()` method.
+**Cause:**
+During UI refactoring, `self.status_label` was removed but the reference in line 420 was not updated.
+**Resolution:**
+Replaced with `self.page_lbl.configure(text="✓ Finished")` to use the existing page label.
+
+## Current State
+The application is stable with all critical bugs resolved.
+- **App Name:** Audile
+- **Build Status:** Passing (PyInstaller)
+- **Version:** 1.0
