@@ -159,9 +159,12 @@ class AudileApp(ctk.CTk):
                                             command=self._hide_current_voice)
         self.hide_voice_btn.pack(side="left", expand=True, fill="x", padx=(2, 0))
 
+        self.speed_label = ctk.CTkLabel(self.play_tab, text="Speed: 1.0x", font=ctk.CTkFont(size=12), text_color=self.CLR_TEXT_SEC)
+        self.speed_label.pack(padx=10, pady=(20, 5))
         self.speed_slider = ctk.CTkSlider(self.play_tab, from_=0.5, to=3.0, button_color=self.CLR_ACCENT, 
                                           progress_color=self.CLR_ACCENT, command=self._on_speed_change)
-        self.speed_slider.pack(padx=10, pady=30, fill="x")
+        self.speed_slider.set(1.0)
+        self.speed_slider.pack(padx=10, pady=(0, 20), fill="x")
 
         self.premium_only_switch = ctk.CTkSwitch(self.play_tab, text="Premium Narrators Only", progress_color=self.CLR_ACCENT,
                                                 command=self._refresh_voice_list)
@@ -191,7 +194,9 @@ class AudileApp(ctk.CTk):
         self.main_container.grid_columnconfigure(0, weight=1)
         self.main_container.grid_rowconfigure(0, weight=1)
 
-        self.canvas = tk.Canvas(self.main_container, bg="#111112", highlightthickness=0)
+        # Dynamic canvas bg for light/dark mode
+        canvas_bg = "#111112" if darkdetect.isDark() else "#F2F2F7"
+        self.canvas = tk.Canvas(self.main_container, bg=canvas_bg, highlightthickness=0)
         self.canvas.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
         
         # Interactions for Canvas
@@ -221,6 +226,10 @@ class AudileApp(ctk.CTk):
         self.progress_bar = ctk.CTkProgressBar(self.main_container, height=3, progress_color=self.CLR_ACCENT, fg_color=("#E5E5EA", "#3A3A3C"))
         self.progress_bar.grid(row=0, column=0, sticky="new", padx=40, pady=(15, 0))
         self.progress_bar.set(0)
+
+        # Version footer
+        self.version_label = ctk.CTkLabel(self.sidebar, text="Audile v1.0", font=ctk.CTkFont(size=11), text_color=self.CLR_TEXT_SEC)
+        self.version_label.pack(side="bottom", pady=(0, 20))
 
         self._refresh_voice_list()
         self._switch_nav("Library")
@@ -417,7 +426,7 @@ class AudileApp(ctk.CTk):
             self.after(600, self._speak_current_block)
         else:
             self._stop()
-            self.status_label.configure(text="Finished Session")
+            self.page_lbl.configure(text="✓ Finished")
 
     def _pause(self): self.tts_engine.pause()
     def _stop(self):
@@ -458,7 +467,9 @@ class AudileApp(ctk.CTk):
         self.zoom_factor = max(0.5, min(5.0, self.zoom_factor))
         self._render_page(force=True)
 
-    def _on_speed_change(self, v): self.tts_engine.set_rate(v)
+    def _on_speed_change(self, v):
+        self.tts_engine.set_rate(v)
+        self.speed_label.configure(text=f"Speed: {v:.1f}x")
     def _on_voice_change(self, display_name):
         """Robustly switch narrator based on menu selection."""
         # Find voice by display name match
@@ -511,7 +522,12 @@ class AudileApp(ctk.CTk):
             if key not in voice_map or v['quality_val'] > voice_map[key]['quality_val']: voice_map[key] = v
         self.voices = sorted(list(voice_map.values()), key=lambda v: (not v.get('is_personal', False), -v['quality_val'], v['name']))
         self.voice_display_names = [f"{v['name']}  {'👤' if v.get('is_personal') else '✨' if v['quality_val']==3 else '★' if v['quality_val']==2 else ''}" for v in self.voices]
-        if self.voice_menu: self.voice_menu.configure(values=self.voice_display_names)
+        if self.voice_menu:
+            self.voice_menu.configure(values=self.voice_display_names)
+            # Auto-select first voice if available
+            if self.voice_display_names and not self.voice_menu.get():
+                self.voice_menu.set(self.voice_display_names[0])
+                self.tts_engine.set_voice(self.voices[0]['id'])
 
     def _add_bookmark(self):
         if not self.current_pdf_path: return
